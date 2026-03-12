@@ -1,0 +1,355 @@
+{% extends "layout.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block breadcrumb %}/ Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-enter">
+
+  <!-- ── Page Header ─────────────────────────────────────────────────── -->
+  <div class="page-header" style="display:flex; align-items:center;
+       justify-content:space-between; flex-wrap:wrap; gap:12px;">
+    <div>
+      <div class="page-title">Welcome back, {{ session.username }} 👋</div>
+      <div class="page-subtitle">Your unified workspace — write, connect, and collaborate.</div>
+    </div>
+    <a href="{{ url_for('editor') }}" class="btn btn-primary">＋ New Document</a>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       §1  KPI STRIP  — 6 stats in a single tight row
+  ══════════════════════════════════════════════════════════════════ -->
+  <div style="display:grid; grid-template-columns:repeat(6,1fr);
+              gap:12px; margin-bottom:28px;">
+
+    <div class="stat-card blue" style="padding:18px 20px; gap:6px;">
+      <div class="stat-icon">📄</div>
+      <div class="stat-value" style="font-size:1.7rem;">{{ docs|length }}</div>
+      <div class="stat-label">Documents</div>
+    </div>
+
+    <div class="stat-card green" style="padding:18px 20px; gap:6px;">
+      <div class="stat-icon">⬡</div>
+      <div class="stat-value" style="font-size:1.7rem;">{{ snippets|length }}</div>
+      <div class="stat-label">Snippets</div>
+    </div>
+
+    <div class="stat-card amber" style="padding:18px 20px; gap:6px;">
+      <div class="stat-icon">💬</div>
+      <div class="stat-value" style="font-size:1.7rem;">{{ unread }}</div>
+      <div class="stat-label">Unread</div>
+    </div>
+
+    <div class="stat-card purple" style="padding:18px 20px; gap:6px;">
+      <div class="stat-icon">👥</div>
+      <div class="stat-value" style="font-size:1.7rem;">{{ users|length }}</div>
+      <div class="stat-label">Teammates</div>
+    </div>
+
+    <div class="stat-card blue" style="padding:18px 20px; gap:6px;">
+      <div class="stat-icon">🧠</div>
+      <div class="stat-value" style="font-size:1.7rem;">{{ available_quizzes }}</div>
+      <div class="stat-label">Quizzes</div>
+    </div>
+
+    <div class="stat-card green" style="padding:18px 20px; gap:6px;">
+      <div class="stat-icon">✅</div>
+      <div class="stat-value" style="font-size:1.7rem;">{{ my_quiz_attempts }}</div>
+      <div class="stat-label">Attempts</div>
+    </div>
+
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       §2  MAIN GRID  — 3 columns: docs (wide) | sidebar (fixed)
+       Left: Recent Documents (full list, compact rows)
+       Right col top: Quick Launch
+       Right col mid: Teammates
+       Right col bot: Quizzes + Vault stacked
+  ══════════════════════════════════════════════════════════════════ -->
+  <div style="display:grid; grid-template-columns:1fr 300px;
+              gap:20px; align-items:start;">
+
+
+    <!-- ── LEFT: Recent Documents ──────────────────────────────────── -->
+    <div style="display:flex; flex-direction:column; gap:20px;">
+
+      <!-- Documents card -->
+      <div class="card" style="padding:0; overflow:hidden;">
+
+        <!-- Card header -->
+        <div style="display:flex; align-items:center; justify-content:space-between;
+                    padding:16px 20px; border-bottom:1px solid var(--border);">
+          <div style="font-weight:700; font-size:0.92rem;">Recent Documents</div>
+          <a href="{{ url_for('editor') }}" class="btn btn-primary btn-sm">＋ New</a>
+        </div>
+
+        <!-- Doc rows — compact list, not oversized grid tiles -->
+        {% if docs %}
+          {% for doc in docs %}
+          <a href="{{ url_for('editor', doc_id=doc.id) }}"
+             style="display:flex; align-items:center; gap:14px; padding:13px 20px;
+                    border-bottom:{{ '1px solid var(--border)' if not loop.last else 'none' }};
+                    text-decoration:none; color:var(--text);
+                    transition:background var(--t) var(--ease);"
+             onmouseover="this.style.background='var(--bg-1)'"
+             onmouseout="this.style.background='transparent'">
+
+            <!-- Icon -->
+            <div style="width:34px; height:34px; border-radius:var(--radius);
+                        background:var(--accent-dim); display:flex; align-items:center;
+                        justify-content:center; font-size:0.95rem; flex-shrink:0;">📄</div>
+
+            <!-- Title + date -->
+            <div style="min-width:0; flex:1;">
+              <div style="font-size:0.875rem; font-weight:600; white-space:nowrap;
+                          overflow:hidden; text-overflow:ellipsis;">{{ doc.title }}</div>
+              <div style="font-size:0.68rem; color:var(--text-4); margin-top:2px;
+                          font-family:'JetBrains Mono',monospace;">
+                {{ doc.updated_at[:16] }}
+              </div>
+            </div>
+
+            <!-- Arrow -->
+            <span style="color:var(--text-4); font-size:0.8rem; flex-shrink:0;">→</span>
+          </a>
+          {% endfor %}
+
+        {% else %}
+          <!-- Empty state — compact, centered -->
+          <div style="text-align:center; padding:48px 24px; color:var(--text-3);">
+            <div style="font-size:2rem; margin-bottom:10px; opacity:0.35;">📄</div>
+            <div style="font-weight:600; font-size:0.88rem; margin-bottom:4px;">No documents yet</div>
+            <div style="font-size:0.78rem; color:var(--text-4); margin-bottom:16px;">
+              Create your first document to get started.
+            </div>
+            <a href="{{ url_for('editor') }}" class="btn btn-primary btn-sm">＋ New Document</a>
+          </div>
+        {% endif %}
+
+      </div>
+      <!-- /Documents card -->
+
+
+      <!-- ── BOTTOM ROW: Vault + Quizzes side-by-side ───────────── -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+
+
+        <!-- Vault Snippets card -->
+        <div class="card" style="padding:0; overflow:hidden;">
+          <div style="display:flex; align-items:center; justify-content:space-between;
+                      padding:14px 18px; border-bottom:1px solid var(--border);">
+            <div style="font-weight:700; font-size:0.88rem; display:flex;
+                        align-items:center; gap:8px;">
+              <span style="opacity:0.6;">⬡</span> Code Vault
+            </div>
+            <a href="{{ url_for('vault') }}"
+               style="font-size:0.75rem; font-weight:600; color:var(--accent);">All →</a>
+          </div>
+
+          {% if snippets %}
+            {% for s in snippets[:5] %}
+            <div style="display:flex; align-items:center; gap:10px; padding:11px 18px;
+                        border-bottom:{{ '1px solid var(--border)' if not loop.last else 'none' }};">
+              <span class="badge badge-blue" style="flex-shrink:0;">{{ s.language }}</span>
+              <span style="font-size:0.82rem; font-weight:500; flex:1; min-width:0;
+                           white-space:nowrap; overflow:hidden;
+                           text-overflow:ellipsis;">{{ s.title }}</span>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div style="text-align:center; padding:28px 16px;
+                        color:var(--text-4); font-size:0.8rem;">
+              No public snippets yet.
+            </div>
+          {% endif %}
+        </div>
+        <!-- /Vault -->
+
+
+        <!-- Quiz Portal card -->
+        <div class="card" style="padding:0; overflow:hidden;">
+          <div style="display:flex; align-items:center; justify-content:space-between;
+                      padding:14px 18px; border-bottom:1px solid var(--border);">
+            <div style="font-weight:700; font-size:0.88rem; display:flex;
+                        align-items:center; gap:8px;">
+              <span style="opacity:0.6;">🧠</span> Quizzes
+            </div>
+            <a href="{{ url_for('quiz_home') }}"
+               style="font-size:0.75rem; font-weight:600; color:var(--accent);">All →</a>
+          </div>
+
+          {% if recent_quizzes %}
+            {% for q in recent_quizzes %}
+            <div style="display:flex; align-items:center; justify-content:space-between;
+                        gap:10px; padding:11px 18px;
+                        border-bottom:{{ '1px solid var(--border)' if not loop.last else 'none' }};">
+              <div style="min-width:0;">
+                <div style="font-size:0.82rem; font-weight:600; white-space:nowrap;
+                            overflow:hidden; text-overflow:ellipsis;">{{ q.title }}</div>
+                <div style="font-size:0.68rem; color:var(--text-4); margin-top:2px;">
+                  by {{ q.creator_name }}
+                </div>
+              </div>
+              <a href="{{ url_for('quiz_attempt', quiz_id=q.id) }}"
+                 class="btn btn-ghost btn-sm" style="flex-shrink:0;">Start</a>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div style="text-align:center; padding:28px 16px;
+                        color:var(--text-4); font-size:0.8rem;">
+              No quizzes published yet.
+            </div>
+          {% endif %}
+        </div>
+        <!-- /Quizzes -->
+
+
+      </div>
+      <!-- /bottom row -->
+
+    </div>
+    <!-- /LEFT COLUMN -->
+
+
+    <!-- ── RIGHT SIDEBAR ───────────────────────────────────────────── -->
+    <div style="display:flex; flex-direction:column; gap:16px;">
+
+
+      <!-- Quick Launch -->
+      <div class="card" style="padding:16px 18px;">
+        <div style="font-size:0.63rem; font-weight:700; text-transform:uppercase;
+                    letter-spacing:0.14em; color:var(--text-4); margin-bottom:12px;">
+          Quick Launch
+        </div>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+
+          <a href="{{ url_for('editor') }}"
+             style="display:flex; align-items:center; gap:10px; padding:9px 12px;
+                    border-radius:var(--radius-sm); font-size:0.84rem; font-weight:500;
+                    color:var(--text-2); text-decoration:none; background:var(--bg-1);
+                    border:1px solid var(--border);
+                    transition:all var(--t) var(--ease);"
+             onmouseover="this.style.background='var(--bg-2)'"
+             onmouseout="this.style.background='var(--bg-1)'">
+            <span style="width:20px; text-align:center; font-size:0.9rem;">📄</span>
+            Word Processor
+            <span style="margin-left:auto; color:var(--text-4); font-size:0.75rem;">→</span>
+          </a>
+
+          <a href="{{ url_for('vault') }}"
+             style="display:flex; align-items:center; gap:10px; padding:9px 12px;
+                    border-radius:var(--radius-sm); font-size:0.84rem; font-weight:500;
+                    color:var(--text-2); text-decoration:none; background:var(--bg-1);
+                    border:1px solid var(--border);
+                    transition:all var(--t) var(--ease);"
+             onmouseover="this.style.background='var(--bg-2)'"
+             onmouseout="this.style.background='var(--bg-1)'">
+            <span style="width:20px; text-align:center; font-size:0.9rem;">⬡</span>
+            Code Vault
+            <span style="margin-left:auto; color:var(--text-4); font-size:0.75rem;">→</span>
+          </a>
+
+          <button onclick="window.chatToggle()"
+             style="display:flex; align-items:center; gap:10px; padding:9px 12px;
+                    border-radius:var(--radius-sm); font-size:0.84rem; font-weight:500;
+                    color:var(--text-2); width:100%; text-align:left; background:var(--bg-1);
+                    border:1px solid var(--border); cursor:pointer;
+                    transition:all var(--t) var(--ease);"
+             onmouseover="this.style.background='var(--bg-2)'"
+             onmouseout="this.style.background='var(--bg-1)'">
+            <span style="width:20px; text-align:center; font-size:0.9rem;">💬</span>
+            Social Hub
+            {% if unread > 0 %}
+            <span class="badge badge-red" style="margin-left:auto;">{{ unread }}</span>
+            {% else %}
+            <span style="margin-left:auto; color:var(--text-4); font-size:0.75rem;">→</span>
+            {% endif %}
+          </button>
+
+          <a href="{{ url_for('quiz_home') }}"
+             style="display:flex; align-items:center; gap:10px; padding:9px 12px;
+                    border-radius:var(--radius-sm); font-size:0.84rem; font-weight:500;
+                    color:var(--text-2); text-decoration:none; background:var(--bg-1);
+                    border:1px solid var(--border);
+                    transition:all var(--t) var(--ease);"
+             onmouseover="this.style.background='var(--bg-2)'"
+             onmouseout="this.style.background='var(--bg-1)'">
+            <span style="width:20px; text-align:center; font-size:0.9rem;">🧠</span>
+            Quiz Portal
+            <span style="margin-left:auto; color:var(--text-4); font-size:0.75rem;">→</span>
+          </a>
+
+          <a href="{{ url_for('settings') }}"
+             style="display:flex; align-items:center; gap:10px; padding:9px 12px;
+                    border-radius:var(--radius-sm); font-size:0.84rem; font-weight:500;
+                    color:var(--text-2); text-decoration:none; background:var(--bg-1);
+                    border:1px solid var(--border);
+                    transition:all var(--t) var(--ease);"
+             onmouseover="this.style.background='var(--bg-2)'"
+             onmouseout="this.style.background='var(--bg-1)'">
+            <span style="width:20px; text-align:center; font-size:0.9rem;">⚙️</span>
+            Settings
+            <span style="margin-left:auto; color:var(--text-4); font-size:0.75rem;">→</span>
+          </a>
+
+        </div>
+      </div>
+      <!-- /Quick Launch -->
+
+
+      <!-- Teammates -->
+      <div class="card" style="padding:0; overflow:hidden;">
+        <div style="display:flex; align-items:center; justify-content:space-between;
+                    padding:14px 18px; border-bottom:1px solid var(--border);">
+          <div style="font-size:0.63rem; font-weight:700; text-transform:uppercase;
+                      letter-spacing:0.14em; color:var(--text-4);">Teammates</div>
+          <span class="badge">{{ users|length }}</span>
+        </div>
+
+        {% if users %}
+          {% for u in users[:6] %}
+          <div style="display:flex; align-items:center; gap:10px; padding:10px 18px;
+                      border-bottom:{{ '1px solid var(--border)' if not loop.last else 'none' }};">
+            <div class="user-avatar"
+                 style="width:28px; height:28px; font-size:0.7rem; flex-shrink:0;">
+              {{ u.username[0].upper() }}
+            </div>
+            <span style="font-size:0.84rem; font-weight:500; flex:1; min-width:0;
+                         white-space:nowrap; overflow:hidden;
+                         text-overflow:ellipsis;">{{ u.username }}</span>
+            <button onclick="window.chatToggle({{ u.id }})"
+                    class="btn btn-ghost btn-sm"
+                    style="flex-shrink:0; padding:4px 10px; font-size:0.72rem;">
+              Chat
+            </button>
+          </div>
+          {% endfor %}
+
+          {% if users|length > 6 %}
+          <div style="padding:10px 18px; font-size:0.75rem; color:var(--text-4);
+                      text-align:center;">
+            +{{ users|length - 6 }} more teammates
+          </div>
+          {% endif %}
+
+        {% else %}
+          <div style="text-align:center; padding:24px 16px;
+                      color:var(--text-4); font-size:0.8rem;">
+            Invite friends to collaborate!
+          </div>
+        {% endif %}
+      </div>
+      <!-- /Teammates -->
+
+
+    </div>
+    <!-- /RIGHT SIDEBAR -->
+
+
+  </div>
+  <!-- /MAIN GRID -->
+
+</div>
+{% endblock %}

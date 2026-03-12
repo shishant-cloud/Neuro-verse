@@ -1,0 +1,121 @@
+{% extends "layout.html" %}
+{% block title %}Admin Panel{% endblock %}
+{% block breadcrumb %}/ Admin Panel{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title">🛡 Admin Panel</div>
+  <div class="page-subtitle">Platform management — users, content, and system stats.</div>
+</div>
+
+<div class="stats-row" style="margin-bottom:28px;">
+  <div class="stat-card blue">
+    <div class="stat-icon">👥</div>
+    <div class="stat-value">{{ users|length }}</div>
+    <div class="stat-label">Total Users</div>
+  </div>
+  <div class="stat-card green">
+    <div class="stat-icon"></div>
+    <div class="stat-value">{{ total_docs }}</div>
+    <div class="stat-label">Documents</div>
+  </div>
+  <div class="stat-card amber">
+    <div class="stat-icon">⬡</div>
+    <div class="stat-value">{{ snippets|length }}</div>
+    <div class="stat-label">Code Snippets</div>
+  </div>
+  <div class="stat-card purple">
+    <div class="stat-icon"></div>
+    <div class="stat-value">{{ total_msgs }}</div>
+    <div class="stat-label">Messages Sent</div>
+  </div>
+  <div class="stat-card blue">
+    <div class="stat-icon"></div>
+    <div class="stat-value">{{ total_quizzes }}</div>
+    <div class="stat-label">Quizzes</div>
+  </div>
+  <div class="stat-card green">
+    <div class="stat-icon"></div>
+    <div class="stat-value">{{ total_attempts }}</div>
+    <div class="stat-label">Quiz Attempts</div>
+  </div>
+</div>
+
+<!-- Quiz Management -->
+<div class="card" style="margin-bottom:24px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <div style="font-size:1rem;font-weight:700;">Quiz Portal</div>
+    <div style="display:flex;gap:8px;">
+      <a href="{{ url_for('quiz_manage') }}" class="btn btn-ghost btn-sm">Manage Quizzes</a>
+      <a href="{{ url_for('quiz_create') }}" class="btn btn-primary btn-sm">+ New Quiz</a>
+    </div>
+  </div>
+  <div style="color:var(--text-2);font-size:0.88rem;">{{ total_quizzes }} quiz(zes) published, {{ total_attempts }} total submissions across all users.</div>
+</div>
+
+<!-- Users Table -->
+<div class="card" style="margin-bottom:24px;">
+  <div style="font-size:1rem;font-weight:700;margin-bottom:16px;">Registered Users</div>
+  <div class="data-table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>ID</th><th>Username</th><th>Email</th><th>Admin</th><th>Joined</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td style="color:var(--text-3);">{{ u.id }}</td>
+          <td style="font-weight:600;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div class="user-avatar" style="width:28px;height:28px;font-size:0.72rem;flex-shrink:0;">{{ u.username[0].upper() }}</div>
+              {{ u.username }}
+            </div>
+          </td>
+          <td style="color:var(--text-2);">{{ u.email }}</td>
+          <td>
+            {% if u.is_admin %}
+            <span class="badge badge-amber">Admin</span>
+            {% else %}
+            <span class="badge">Member</span>
+            {% endif %}
+          </td>
+          <td style="color:var(--text-3);font-size:0.8rem;">{{ u.created_at[:10] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Snippets Table -->
+<div class="card">
+  <div style="font-size:1rem;font-weight:700;margin-bottom:16px;">All Code Snippets</div>
+  <div class="data-table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr><th>ID</th><th>Title</th><th>Language</th><th>Author</th><th>Public</th><th>Created</th></tr>
+      </thead>
+      <tbody>
+        {% for s in snippets %}
+        <tr>
+          <td style="color:var(--text-3);">{{ s.id }}</td>
+          <td style="font-weight:500;">{{ s.title }}</td>
+          <td><span class="badge badge-blue">{{ s.language }}</span></td>
+          <td style="color:var(--text-2);">{{ s.username }}</td>
+          <td>
+            {% if s.is_public %}
+            <span class="badge badge-green">Public</span>
+            {% else %}
+            <span class="badge badge-red">Private</span>
+            {% endif %}
+          </td>
+          <td style="color:var(--text-3);font-size:0.8rem;">{{ s.created_at[:10] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

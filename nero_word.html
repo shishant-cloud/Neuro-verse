@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Neuro Word | Editor</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    /* ── Layout: sidebar + editor side-by-side ── */
+    .editor-body {
+      height: 100vh;
+      overflow: hidden;
+    }
+    .word-navbar {
+      height: 52px;
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    /* Brand block */
+    .nw-logo-block {
+      width: 30px; height: 30px;
+      background: var(--text);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 0.68rem; color: var(--bg);
+      letter-spacing: -0.02em; flex-shrink: 0;
+    }
+    .brand-name {
+      font-weight: 800;
+      font-size: 0.88rem;
+      letter-spacing: 0.06em;
+      color: var(--text);
+    }
+    .brand-name span { color: var(--accent); }
+    /* Title input */
+    #docTitleInput {
+      border: none; outline: none; background: transparent;
+      font-family: 'Raleway', sans-serif;
+      font-size: 0.875rem; font-weight: 600; color: var(--text-2);
+      min-width: 80px; max-width: 260px;
+      padding: 4px 8px; border-radius: 5px;
+      transition: background 0.15s;
+    }
+    #docTitleInput:hover { background: var(--bg-2); }
+    #docTitleInput:focus { background: var(--accent-dim); color: var(--accent); }
+    .save-status { font-size: 0.7rem; font-weight: 600; color: var(--accent-2); font-family: 'JetBrains Mono', monospace; }
+    .save-status.unsaved { color: var(--accent-3); }
+    /* Toolbar */
+    .toolbar {
+      height: 40px;
+      padding: 0 16px;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      gap: 2px;
+    }
+    .toolbar::-webkit-scrollbar { height: 0; }
+    /* Editor layout body */
+    .editor-layout {
+      display: flex;
+      height: calc(100vh - 52px - 40px - 28px);
+      overflow: hidden;
+    }
+    /* Sidebar */
+    .nw-sidebar {
+      width: 210px;
+      background: var(--bg-raised);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .nw-sb-head {
+      padding: 12px 12px 10px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .nw-sb-label {
+      font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.14em; color: var(--text-4); margin-bottom: 8px;
+    }
+    .nw-sb-new {
+      display: flex; align-items: center; justify-content: center; gap: 5px;
+      width: 100%; padding: 7px;
+      background: var(--accent); color: #fff;
+      border: none; border-radius: 6px;
+      font-family: 'Raleway', sans-serif;
+      font-size: 0.78rem; font-weight: 700;
+      cursor: pointer; text-decoration: none;
+      transition: background 0.13s;
+    }
+    .nw-sb-new:hover { background: var(--accent-hover); }
+    .nw-doc-list { flex: 1; overflow-y: auto; padding: 4px 6px; }
+    .nw-doc-list::-webkit-scrollbar { width: 3px; }
+    .nw-doc-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+    .nw-doc-row {
+      display: flex; align-items: center; gap: 8px; padding: 7px 7px;
+      border-radius: 6px; text-decoration: none; color: var(--text-2);
+      transition: background 0.11s;
+    }
+    .nw-doc-row:hover { background: var(--bg-2); }
+    .nw-doc-row.active { background: var(--accent-dim); color: var(--accent); }
+    .nw-doc-ico {
+      width: 26px; height: 26px; border-radius: 5px;
+      background: var(--bg-2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem; flex-shrink: 0;
+    }
+    .nw-doc-row.active .nw-doc-ico { background: var(--accent-dim); }
+    .nw-doc-text { min-width: 0; }
+    .nw-doc-title {
+      font-size: 0.78rem; font-weight: 600;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .nw-doc-meta { font-size: 0.62rem; color: var(--text-4); font-family: 'JetBrains Mono', monospace; margin-top: 1px; }
+    .nw-sb-foot { padding: 8px 8px; border-top: 1px solid var(--border); flex-shrink: 0; }
+    /* Canvas */
+    #page-container {
+      flex: 1;
+      overflow-y: auto;
+      background: #D8DCE3;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 36px 28px;
+    }
+    #page {
+      caret-color: var(--accent);
+    }
+    /* Status bar */
+    .nw-statusbar {
+      height: 28px;
+      background: var(--bg-raised);
+      border-top: 1px solid var(--border);
+      display: flex; align-items: center;
+      padding: 0 16px; gap: 18px; flex-shrink: 0;
+    }
+    .nw-stat {
+      font-size: 0.67rem; font-family: 'JetBrains Mono', monospace;
+      color: var(--text-4); letter-spacing: 0.02em;
+    }
+  </style>
+</head>
+<body class="editor-body">
+
+<!-- ── NAVBAR ─────────────────────────────────────────────────────────── -->
+<nav class="word-navbar">
+  <a href="{{ url_for('dashboard') }}" style="display:flex;align-items:center;gap:9px;text-decoration:none;flex-shrink:0;">
+    <div class="nw-logo-block">NW</div>
+    <span class="brand-name">NEURO<span>WORD</span></span>
+  </a>
+  <div class="nav-separator"></div>
+  <input id="docTitleInput" type="text"
+         value="{{ doc.title if doc else 'Untitled Document' }}"
+         placeholder="Untitled Document" title="Click to rename" />
+  <span class="save-status" id="saveStatus">● Saved</span>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+    <a href="{{ url_for('dashboard') }}" class="nav-link">← Dashboard</a>
+    <div class="nav-separator"></div>
+    <button class="tool-btn" onclick="exportPDF()" style="border:1px solid var(--border);padding:0 14px;height:30px;">↓ PDF</button>
+    <button class="tool-btn" onclick="saveDoc()"
+            style="background:var(--text);color:var(--bg);border:none;padding:0 16px;height:30px;font-weight:700;">
+      Save
+    </button>
+  </div>
+</nav>
+
+<!-- ── TOOLBAR ─────────────────────────────────────────────────────────── -->
+<div class="toolbar">
+  <!-- History -->
+  <div class="tool-group">
+    <button class="tool-btn" onclick="document.execCommand('undo')" title="Undo">↩</button>
+    <button class="tool-btn" onclick="document.execCommand('redo')" title="Redo">↪</button>
+  </div>
+  <div class="v-line"></div>
+
+  <!-- Font -->
+  <div class="tool-group">
+    <select class="tool-select" onchange="document.execCommand('fontName',false,this.value)" title="Font">
+      <option value="'Times New Roman',serif">Times New Roman</option>
+      <option value="Arial,sans-serif">Arial</option>
+      <option value="Georgia,serif">Georgia</option>
+      <option value="'Courier New',monospace">Courier New</option>
+      <option value="Helvetica,sans-serif">Helvetica</option>
+      <option value="'Raleway',sans-serif">Raleway</option>
+    </select>
+    <input type="number" id="fsInput" value="12" min="6" max="96"
+           onchange="setFontSize(this.value)" title="Size"
+           style="width:44px;height:28px;text-align:center;border:1px solid var(--border);border-radius:4px;background:var(--bg-2);font-family:'Raleway',sans-serif;font-size:0.75rem;outline:none;">
+  </div>
+  <div class="v-line"></div>
+
+  <!-- Format -->
+  <div class="tool-group">
+    <button class="tool-btn" onclick="fmt('bold')"          title="Bold"><b>B</b></button>
+    <button class="tool-btn" onclick="fmt('italic')"        title="Italic"><i>I</i></button>
+    <button class="tool-btn" onclick="fmt('underline')"     title="Underline"><u>U</u></button>
+    <button class="tool-btn" onclick="fmt('strikeThrough')" title="Strike" style="text-decoration:line-through;">S</button>
+  </div>
+  <div class="v-line"></div>
+
+  <!-- Align -->
+  <div class="tool-group">
+    <button class="tool-btn" onclick="fmt('justifyLeft')"   title="Left align"   style="font-size:0.75rem;">≡L</button>
+    <button class="tool-btn" onclick="fmt('justifyCenter')" title="Center"       style="font-size:0.75rem;">≡C</button>
+    <button class="tool-btn" onclick="fmt('justifyRight')"  title="Right align"  style="font-size:0.75rem;">≡R</button>
+    <button class="tool-btn" onclick="fmt('justifyFull')"   title="Justify"      style="font-size:0.75rem;">≡J</button>
+  </div>
+  <div class="v-line"></div>
+
+  <!-- Lists & Headings -->
+  <div class="tool-group">
+    <button class="tool-btn" onclick="fmt('insertUnorderedList')" title="Bullet list">• List</button>
+    <button class="tool-btn" onclick="fmt('insertOrderedList')"   title="Numbered list">1. List</button>
+    <button class="tool-btn" onclick="fmt('formatBlock','h1')" title="Heading 1" style="font-weight:800;">H1</button>
+    <button class="tool-btn" onclick="fmt('formatBlock','h2')" title="Heading 2" style="font-weight:700;">H2</button>
+    <button class="tool-btn" onclick="fmt('formatBlock','h3')" title="Heading 3" style="font-weight:600;">H3</button>
+  </div>
+  <div class="v-line"></div>
+
+  <!-- Table + Color + Clear -->
+  <div class="tool-group">
+    <button class="tool-btn" onclick="insertTable()" title="Insert table">⊞ Table</button>
+    <input type="color" class="color-picker" onchange="fmt('foreColor',this.value)" title="Text color" value="#000000">
+    <button class="tool-btn" onclick="fmt('removeFormat')" title="Clear formatting" style="color:var(--text-3);">✕ Fmt</button>
+  </div>
+</div>
+
+<!-- ── BODY: sidebar + canvas ─────────────────────────────────────────── -->
+<div class="editor-layout">
+
+  <!-- Recent docs sidebar -->
+  <aside class="nw-sidebar">
+    <div class="nw-sb-head">
+      <div class="nw-sb-label">My Documents</div>
+      <a href="{{ url_for('editor') }}" class="nw-sb-new">＋ New Document</a>
+    </div>
+    <div class="nw-doc-list">
+      {% if recent_docs %}
+        {% for d in recent_docs %}
+        <a href="{{ url_for('editor', doc_id=d.id) }}"
+           class="nw-doc-row {% if doc and doc.id == d.id %}active{% endif %}">
+          <div class="nw-doc-ico">📄</div>
+          <div class="nw-doc-text">
+            <div class="nw-doc-title">{{ d.title or 'Untitled' }}</div>
+            <div class="nw-doc-meta">{{ d.updated_at[:10] }}</div>
+          </div>
+        </a>
+        {% endfor %}
+      {% else %}
+        <div style="padding:20px 8px;text-align:center;color:var(--text-4);font-size:0.77rem;line-height:1.7;">
+          No documents yet.<br>Create your first one!
+        </div>
+      {% endif %}
+    </div>
+    <div class="nw-sb-foot">
+      <a href="{{ url_for('dashboard') }}"
+         style="display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:5px;
+                text-decoration:none;color:var(--text-3);font-size:0.76rem;font-weight:500;
+                transition:background 0.12s;"
+         onmouseover="this.style.background='var(--bg-2)'"
+         onmouseout="this.style.background='transparent'">
+        ← Dashboard
+      </a>
+    </div>
+  </aside>
+
+  <!-- Editor canvas -->
+  <div id="page-container">
+    <div id="page" contenteditable="true" spellcheck="true"
+         data-placeholder="Start typing your document…">
+      {% if doc and doc.content %}{{ doc.content|safe }}{% else %}<p><br></p>{% endif %}
+    </div>
+  </div>
+
+</div>
+
+<!-- ── STATUS BAR ─────────────────────────────────────────────────────── -->
+<div class="nw-statusbar">
+  <span class="nw-stat" id="wc">Words: 0</span>
+  <span class="nw-stat" id="cc">Chars: 0</span>
+  <span class="nw-stat">A4 · 210 × 297 mm</span>
+  <span class="nw-stat" style="margin-left:auto;">Ctrl+S to save</span>
+</div>
+
+<!-- ── SCRIPTS ─────────────────────────────────────────────────────────── -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+  let docId  = {{ doc.id if doc else 'null' }};
+  let dirty  = false;
+  let timer  = null;
+  const page = document.getElementById('page');
+  const titleEl = document.getElementById('docTitleInput');
+  const statusEl = document.getElementById('saveStatus');
+
+  function fmt(cmd, val) { document.execCommand(cmd, false, val || null); page.focus(); }
+
+  function setFontSize(s) {
+    document.execCommand('fontSize', false, '7');
+    document.querySelectorAll('font[size="7"]').forEach(el => {
+      el.removeAttribute('size'); el.style.fontSize = s + 'pt';
+    });
+  }
+
+  function insertTable() {
+    const r = parseInt(prompt('Number of rows?', '3') || 0);
+    const c = parseInt(prompt('Number of columns?', '3') || 0);
+    if (!r || !c) return;
+    let h = '<table style="border-collapse:collapse;width:100%"><tbody>';
+    for (let i = 0; i < r; i++) {
+      h += '<tr>';
+      for (let j = 0; j < c; j++)
+        h += '<td style="border:1px solid #ccc;padding:7px 12px;">&nbsp;</td>';
+      h += '</tr>';
+    }
+    h += '</tbody></table><p><br></p>';
+    fmt('insertHTML', h);
+  }
+
+  function updateCounts() {
+    const t = page.innerText || '';
+    const w = t.trim() === '' ? 0 : t.trim().split(/\s+/).length;
+    document.getElementById('wc').textContent = 'Words: ' + w;
+    document.getElementById('cc').textContent = 'Chars: ' + t.replace(/\n/g, '').length;
+  }
+
+  function markDirty() {
+    dirty = true;
+    statusEl.textContent = '● Unsaved';
+    statusEl.className = 'save-status unsaved';
+    clearTimeout(timer);
+    timer = setTimeout(saveDoc, 2500);
+  }
+
+  async function saveDoc() {
+    clearTimeout(timer);
+    const t = titleEl.value.trim() || 'Untitled Document';
+    const c = page.innerHTML;
+    try {
+      const res = await fetch('/api/document/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: t, content: c, doc_id: docId })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        docId = data.doc_id;
+        dirty = false;
+        statusEl.textContent = '● Saved';
+        statusEl.className = 'save-status';
+        history.replaceState(null, '', '/editor/' + docId);
+      }
+    } catch(e) {
+      statusEl.textContent = '● Failed';
+      statusEl.className = 'save-status unsaved';
+    }
+  }
+
+  function exportPDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const lines = (page.innerText || '').split('\n');
+    let y = 20;
+    doc.setFont('times', 'normal'); doc.setFontSize(12);
+    lines.forEach(l => {
+      if (y > 272) { doc.addPage(); y = 20; }
+      doc.text(l, 20, y); y += 7;
+    });
+    doc.save((titleEl.value.trim() || 'document') + '.pdf');
+  }
+
+  page.addEventListener('input', () => { updateCounts(); markDirty(); });
+  titleEl.addEventListener('input', markDirty);
+
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveDoc(); }
+  });
+  window.addEventListener('beforeunload', e => {
+    if (dirty) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  updateCounts();
+</script>
+</body>
+</html>

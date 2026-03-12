@@ -1,0 +1,439 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard — NeuroVerse{% endblock %}
+
+{% block content %}
+<div class="page-enter">
+
+  <!-- ── Page Header ──────────────────────────────────────────────────── -->
+  <div class="page-header" style="display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:16px; margin-bottom:32px;">
+    <div>
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+        <div style="width:8px; height:8px; border-radius:50%; background:var(--accent-2);
+                    box-shadow:0 0 0 3px var(--accent-2-dim);"></div>
+        <span style="font-size:0.68rem; font-weight:700; text-transform:uppercase;
+                     letter-spacing:0.14em; color:var(--text-4);">Admin Dashboard</span>
+      </div>
+      <div class="page-title">Welcome back, {{ session.get('username') }} 👋</div>
+      <div class="page-subtitle">Here's everything happening across NeuroVerse right now.</div>
+    </div>
+    <a href="{{ url_for('quiz_create') }}" class="btn btn-primary">
+      <span style="font-size:1rem; line-height:1;">＋</span> New Quiz
+    </a>
+  </div>
+
+
+  <!-- ── §1  Stats Row (4 KPI cards) ─────────────────────────────────── -->
+  <div class="stats-row" style="margin-bottom:32px;">
+
+    <div class="stat-card blue">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <div style="width:36px; height:36px; border-radius:var(--radius);
+                    background:var(--accent-dim); display:flex; align-items:center;
+                    justify-content:center; font-size:1rem;">📋</div>
+        <span class="badge badge-blue">Live</span>
+      </div>
+      <div class="stat-value">{{ total_quizzes }}</div>
+      <div class="stat-label">Active Quizzes</div>
+      <a href="{{ url_for('quiz_manage') }}"
+         style="display:inline-flex; align-items:center; gap:4px; margin-top:14px;
+                font-size:0.75rem; font-weight:600; color:var(--accent); text-decoration:none;">
+        Manage → 
+      </a>
+    </div>
+
+    <div class="stat-card green">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <div style="width:36px; height:36px; border-radius:var(--radius);
+                    background:var(--accent-2-dim); display:flex; align-items:center;
+                    justify-content:center; font-size:1rem;">👤</div>
+        <span class="badge badge-green">Total</span>
+      </div>
+      <div class="stat-value">{{ total_students }}</div>
+      <div class="stat-label">Students Enrolled</div>
+      <div style="margin-top:14px; font-size:0.75rem; color:var(--text-4);">Across all courses</div>
+    </div>
+
+    <div class="stat-card amber">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <div style="width:36px; height:36px; border-radius:var(--radius);
+                    background:var(--accent-3-dim); display:flex; align-items:center;
+                    justify-content:center; font-size:1rem;">📨</div>
+        <span class="badge badge-amber">All time</span>
+      </div>
+      <div class="stat-value">{{ total_responses }}</div>
+      <div class="stat-label">Submissions</div>
+      <div style="margin-top:14px; font-size:0.75rem; color:var(--text-4);">Quiz responses</div>
+    </div>
+
+    <div class="stat-card purple">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <div style="width:36px; height:36px; border-radius:var(--radius);
+                    background:var(--accent-4-dim); display:flex; align-items:center;
+                    justify-content:center; font-size:1rem;">✅</div>
+        <span class="badge badge-purple">Pending</span>
+      </div>
+      <div class="stat-value">{{ tasks|length }}</div>
+      <div class="stat-label">Open Tasks</div>
+      <a href="{{ url_for('todo_list') }}"
+         style="display:inline-flex; align-items:center; gap:4px; margin-top:14px;
+                font-size:0.75rem; font-weight:600; color:var(--accent-4); text-decoration:none;">
+        View board →
+      </a>
+    </div>
+
+  </div>
+
+
+  <!-- ── §2  Main Content — Two-column grid ───────────────────────────── -->
+  <div style="display:grid; grid-template-columns:1fr 380px; gap:24px; align-items:start;">
+
+    <!-- ── LEFT COLUMN ──────────────────────────────────────────────── -->
+    <div style="display:flex; flex-direction:column; gap:24px;">
+
+
+      <!-- Live Assessments card -->
+      <div class="card" style="padding:0; overflow:hidden;">
+
+        <!-- Card header -->
+        <div style="display:flex; align-items:center; justify-content:space-between;
+                    padding:20px 24px 18px; border-bottom:1px solid var(--border);">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div style="width:32px; height:32px; border-radius:var(--radius-sm);
+                        background:var(--accent-dim); display:flex; align-items:center;
+                        justify-content:center; font-size:0.9rem;">📋</div>
+            <div>
+              <div style="font-weight:700; font-size:0.95rem; color:var(--text);">Live Assessments</div>
+              <div style="font-size:0.72rem; color:var(--text-4); margin-top:1px;">
+                {{ total_quizzes }} quiz{{ 'zes' if total_quizzes != 1 else '' }} published
+              </div>
+            </div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <a href="{{ url_for('quiz_manage') }}" class="btn btn-ghost btn-sm">View All</a>
+            <a href="{{ url_for('quiz_create') }}" class="btn btn-primary btn-sm">＋ Create</a>
+          </div>
+        </div>
+
+        <!-- Quiz list -->
+        {% if quizzes %}
+          {% for quiz in quizzes %}
+          <div style="display:flex; align-items:center; justify-content:space-between;
+                      padding:16px 24px;
+                      border-bottom:{{ '1px solid var(--border)' if not loop.last else 'none' }};
+                      transition:background var(--t) var(--ease);"
+               onmouseover="this.style.background='var(--bg-1)'"
+               onmouseout="this.style.background='transparent'">
+
+            <!-- Quiz info -->
+            <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+              <div style="width:36px; height:36px; border-radius:var(--radius);
+                          background:var(--accent-dim); display:flex; align-items:center;
+                          justify-content:center; font-family:'JetBrains Mono',monospace;
+                          font-size:0.68rem; font-weight:600; color:var(--accent); flex-shrink:0;">
+                #{{ quiz.id }}
+              </div>
+              <div style="min-width:0;">
+                <div style="font-weight:600; font-size:0.9rem; color:var(--text);
+                            white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                  {{ quiz.title }}
+                </div>
+                <div style="font-size:0.72rem; color:var(--text-4); margin-top:2px;
+                            font-family:'JetBrains Mono',monospace;">
+                  {{ quiz.q_count }} question{{ 's' if quiz.q_count != 1 else '' }}
+                  · {{ quiz.resp_count }} response{{ 's' if quiz.resp_count != 1 else '' }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+              <span class="badge badge-green">Active</span>
+              <a href="{{ url_for('quiz_responses', quiz_id=quiz.id) }}"
+                 class="btn btn-ghost btn-sm">Results</a>
+              <form action="{{ url_for('quiz_delete', quiz_id=quiz.id) }}" method="POST"
+                    onsubmit="return confirm('Delete this quiz and all its responses?')"
+                    style="margin:0;">
+                <button type="submit" class="btn btn-danger btn-sm"
+                        title="Delete quiz">✕</button>
+              </form>
+            </div>
+
+          </div>
+          {% endfor %}
+
+        {% else %}
+          <div style="text-align:center; padding:52px 24px; color:var(--text-3);">
+            <div style="font-size:2.4rem; margin-bottom:14px; opacity:0.4;">📋</div>
+            <div style="font-weight:600; font-size:0.92rem; margin-bottom:6px;">No quizzes yet</div>
+            <div style="font-size:0.82rem; color:var(--text-4); margin-bottom:20px;">
+              Create your first assessment to get started.
+            </div>
+            <a href="{{ url_for('quiz_create') }}" class="btn btn-primary btn-sm">＋ Create Quiz</a>
+          </div>
+        {% endif %}
+
+      </div>
+      <!-- /Live Assessments -->
+
+
+      <!-- Code Vault Preview card -->
+      <div class="card" style="padding:0; overflow:hidden;">
+
+        <div style="display:flex; align-items:center; justify-content:space-between;
+                    padding:20px 24px 18px; border-bottom:1px solid var(--border);">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div style="width:32px; height:32px; border-radius:var(--radius-sm);
+                        background:var(--accent-4-dim); display:flex; align-items:center;
+                        justify-content:center; font-size:0.9rem;">⬡</div>
+            <div>
+              <div style="font-weight:700; font-size:0.95rem; color:var(--text);">Code Vault</div>
+              <div style="font-size:0.72rem; color:var(--text-4); margin-top:1px;">
+                Recent public snippets
+              </div>
+            </div>
+          </div>
+          <a href="{{ url_for('vault') }}" class="btn btn-ghost btn-sm">View All</a>
+        </div>
+
+        {% if snippets %}
+          <div style="padding:8px 12px;">
+            {% for s in snippets %}
+            <div style="display:flex; align-items:center; gap:12px; padding:10px 12px;
+                        border-radius:var(--radius); cursor:default;
+                        transition:background var(--t) var(--ease);"
+                 onmouseover="this.style.background='var(--bg-1)'"
+                 onmouseout="this.style.background='transparent'">
+              <div style="min-width:0; flex:1;">
+                <div style="font-size:0.875rem; font-weight:600; color:var(--text);
+                            white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                  {{ s.title }}
+                </div>
+                <div style="font-size:0.7rem; color:var(--text-4); margin-top:2px;
+                            font-family:'JetBrains Mono',monospace;">
+                  by {{ s.username }}
+                </div>
+              </div>
+              <span class="badge badge-blue">{{ s.language }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div style="text-align:center; padding:36px 24px; color:var(--text-4); font-size:0.83rem;">
+            No snippets yet
+          </div>
+        {% endif %}
+
+      </div>
+      <!-- /Code Vault -->
+
+
+    </div>
+    <!-- /LEFT COLUMN -->
+
+
+    <!-- ── RIGHT COLUMN ─────────────────────────────────────────────── -->
+    <div style="display:flex; flex-direction:column; gap:24px;">
+
+
+      <!-- Quick Actions card -->
+      <div class="card" style="padding:20px 22px;">
+        <div style="font-size:0.68rem; font-weight:700; text-transform:uppercase;
+                    letter-spacing:0.14em; color:var(--text-4); margin-bottom:14px;">
+          Quick Actions
+        </div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+
+          <a href="{{ url_for('quiz_create') }}"
+             style="display:flex; align-items:center; gap:12px; padding:11px 14px;
+                    background:var(--bg-1); border:1px solid var(--border);
+                    border-radius:var(--radius); text-decoration:none; color:var(--text-2);
+                    font-size:0.86rem; font-weight:500;
+                    transition:all var(--t) var(--ease);"
+             onmouseover="this.style.background='var(--bg-2)';this.style.borderColor='var(--border-2)'"
+             onmouseout="this.style.background='var(--bg-1)';this.style.borderColor='var(--border)'">
+            <span style="font-size:1rem;">📋</span>
+            <span>Create New Quiz</span>
+            <span style="margin-left:auto; color:var(--text-4); font-size:0.8rem;">→</span>
+          </a>
+
+          <a href="{{ url_for('quiz_manage') }}"
+             style="display:flex; align-items:center; gap:12px; padding:11px 14px;
+                    background:var(--bg-1); border:1px solid var(--border);
+                    border-radius:var(--radius); text-decoration:none; color:var(--text-2);
+                    font-size:0.86rem; font-weight:500;
+                    transition:all var(--t) var(--ease);"
+             onmouseover="this.style.background='var(--bg-2)';this.style.borderColor='var(--border-2)'"
+             onmouseout="this.style.background='var(--bg-1)';this.style.borderColor='var(--border)'">
+            <span style="font-size:1rem;">🗂️</span>
+            <span>Manage All Quizzes</span>
+            <span style="margin-left:auto; color:var(--text-4); font-size:0.8rem;">→</span>
+          </a>
+
+          <a href="{{ url_for('vault') }}"
+             style="display:flex; align-items:center; gap:12px; padding:11px 14px;
+                    background:var(--bg-1); border:1px solid var(--border);
+                    border-radius:var(--radius); text-decoration:none; color:var(--text-2);
+                    font-size:0.86rem; font-weight:500;
+                    transition:all var(--t) var(--ease);"
+             onmouseover="this.style.background='var(--bg-2)';this.style.borderColor='var(--border-2)'"
+             onmouseout="this.style.background='var(--bg-1)';this.style.borderColor='var(--border)'">
+            <span style="font-size:1rem;">⬡</span>
+            <span>Browse Code Vault</span>
+            <span style="margin-left:auto; color:var(--text-4); font-size:0.8rem;">→</span>
+          </a>
+
+          <a href="{{ url_for('todo_list') }}"
+             style="display:flex; align-items:center; gap:12px; padding:11px 14px;
+                    background:var(--bg-1); border:1px solid var(--border);
+                    border-radius:var(--radius); text-decoration:none; color:var(--text-2);
+                    font-size:0.86rem; font-weight:500;
+                    transition:all var(--t) var(--ease);"
+             onmouseover="this.style.background='var(--bg-2)';this.style.borderColor='var(--border-2)'"
+             onmouseout="this.style.background='var(--bg-1)';this.style.borderColor='var(--border)'">
+            <span style="font-size:1rem;">✅</span>
+            <span>Task Board</span>
+            <span style="margin-left:auto; color:var(--text-4); font-size:0.8rem;">→</span>
+          </a>
+
+        </div>
+      </div>
+      <!-- /Quick Actions -->
+
+
+      <!-- Task Board card -->
+      <div class="card" style="padding:0; overflow:hidden;">
+
+        <div style="display:flex; align-items:center; justify-content:space-between;
+                    padding:18px 22px 16px; border-bottom:1px solid var(--border);">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div style="width:32px; height:32px; border-radius:var(--radius-sm);
+                        background:var(--accent-2-dim); display:flex; align-items:center;
+                        justify-content:center; font-size:0.9rem;">✅</div>
+            <div>
+              <div style="font-weight:700; font-size:0.92rem; color:var(--text);">Task Board</div>
+              <div style="font-size:0.71rem; color:var(--text-4); margin-top:1px;">
+                {{ tasks|length }} pending task{{ 's' if tasks|length != 1 else '' }}
+              </div>
+            </div>
+          </div>
+          <a href="{{ url_for('todo_list') }}" class="btn btn-ghost btn-sm">Manage</a>
+        </div>
+
+        {% if tasks %}
+          <div style="padding:10px 12px; display:flex; flex-direction:column; gap:6px;">
+            {% for task in tasks %}
+            <div style="padding:11px 14px; background:var(--bg-1); border:1px solid var(--border);
+                        border-radius:var(--radius);
+                        border-left:3px solid
+                          {% if task.priority == 'high' %}var(--danger)
+                          {% elif task.priority == 'medium' %}var(--accent-3)
+                          {% else %}var(--accent-2){% endif %};">
+
+              <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
+                <div style="font-size:0.86rem; font-weight:600; min-width:0;
+                            {% if task.is_completed %}text-decoration:line-through;color:var(--text-3);{% else %}color:var(--text);{% endif %}
+                            white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                  {{ task.title }}
+                </div>
+                <span class="badge
+                  {% if task.priority == 'high' %}badge-red
+                  {% elif task.priority == 'medium' %}badge-amber
+                  {% else %}badge-green{% endif %}"
+                  style="flex-shrink:0;">
+                  {{ task.priority }}
+                </span>
+              </div>
+
+              {% if task.due_date %}
+              <div style="font-size:0.7rem; color:var(--text-4); margin-top:5px;
+                          font-family:'JetBrains Mono',monospace; letter-spacing:0.02em;">
+                Due: {{ task.due_date }}
+              </div>
+              {% endif %}
+
+            </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div style="text-align:center; padding:40px 22px; color:var(--text-3);">
+            <div style="font-size:2rem; margin-bottom:12px; opacity:0.4;">🎉</div>
+            <div style="font-weight:600; font-size:0.88rem; margin-bottom:4px;">All clear!</div>
+            <div style="font-size:0.78rem; color:var(--text-4); margin-bottom:16px;">
+              No pending tasks right now.
+            </div>
+            <a href="{{ url_for('todo_list') }}" class="btn btn-ghost btn-sm">＋ Add Task</a>
+          </div>
+        {% endif %}
+
+      </div>
+      <!-- /Task Board -->
+
+
+      <!-- System Status pill card -->
+      <div class="card" style="padding:18px 22px;">
+        <div style="font-size:0.68rem; font-weight:700; text-transform:uppercase;
+                    letter-spacing:0.14em; color:var(--text-4); margin-bottom:14px;">
+          System Status
+        </div>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <span style="font-size:0.83rem; color:var(--text-2);">Quiz Portal</span>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <div style="width:7px; height:7px; border-radius:50%;
+                          background:var(--accent-2);
+                          box-shadow:0 0 0 2px var(--accent-2-dim);"></div>
+              <span style="font-size:0.75rem; font-weight:600; color:var(--accent-2);">Operational</span>
+            </div>
+          </div>
+
+          <div style="height:1px; background:var(--border);"></div>
+
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <span style="font-size:0.83rem; color:var(--text-2);">Social Hub</span>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <div style="width:7px; height:7px; border-radius:50%;
+                          background:var(--accent-2);
+                          box-shadow:0 0 0 2px var(--accent-2-dim);"></div>
+              <span style="font-size:0.75rem; font-weight:600; color:var(--accent-2);">Online</span>
+            </div>
+          </div>
+
+          <div style="height:1px; background:var(--border);"></div>
+
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <span style="font-size:0.83rem; color:var(--text-2);">Code Vault</span>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <div style="width:7px; height:7px; border-radius:50%;
+                          background:var(--accent-2);
+                          box-shadow:0 0 0 2px var(--accent-2-dim);"></div>
+              <span style="font-size:0.75rem; font-weight:600; color:var(--accent-2);">Operational</span>
+            </div>
+          </div>
+
+          <div style="height:1px; background:var(--border);"></div>
+
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <span style="font-size:0.83rem; color:var(--text-2);">Database</span>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <div style="width:7px; height:7px; border-radius:50%;
+                          background:var(--accent-2);
+                          box-shadow:0 0 0 2px var(--accent-2-dim);"></div>
+              <span style="font-size:0.75rem; font-weight:600; color:var(--accent-2);">Healthy</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+      <!-- /System Status -->
+
+
+    </div>
+    <!-- /RIGHT COLUMN -->
+
+  </div>
+  <!-- /Main Content Grid -->
+
+</div>
+<!-- /page-enter -->
+{% endblock %}

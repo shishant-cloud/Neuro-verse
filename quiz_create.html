@@ -1,0 +1,141 @@
+{% extends "layout.html" %}
+{% block title %}Create Quiz{% endblock %}
+{% block breadcrumb %}/ Quiz Portal / Create{% endblock %}
+
+{% block head %}
+<style>
+.q-block {
+  background: var(--bg-raised, #1a1f2e);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius, 12px);
+  padding: 22px 24px;
+  margin-bottom: 18px;
+  animation: fadeSlideIn 0.25s ease both;
+}
+@keyframes fadeSlideIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+.option-row { display:flex;align-items:center;gap:10px;margin-bottom:8px; }
+.option-letter { font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--accent);width:22px;flex-shrink:0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header flex items-center justify-between">
+  <div>
+    <div class="page-title"> Create Assessment</div>
+    <div class="page-subtitle">Design your quiz — mix MCQ and open-answer questions.</div>
+  </div>
+  <a href="{{ url_for('quiz_manage') }}" class="btn btn-ghost">← Back</a>
+</div>
+
+<div class="card" style="max-width:860px;">
+  <form action="{{ url_for('quiz_create') }}" method="POST" id="quizForm">
+
+    <div class="form-group" style="margin-bottom:24px;">
+      <label>Quiz Title</label>
+      <input class="form-input" type="text" name="quiz_title"
+             placeholder="e.g., Computer Networks Midterm 2026" required style="font-size:1.05rem;font-weight:600;">
+    </div>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:0 0 24px;">
+
+    <div id="questionsContainer"></div>
+
+    <button type="button" class="btn btn-ghost" onclick="addQuestion()"
+            style="margin-bottom:24px;gap:8px;">
+      <span style="font-size:1.2rem;line-height:1;">+</span> Add Question
+    </button>
+
+    <div style="display:flex;justify-content:flex-end;gap:10px;">
+      <a href="{{ url_for('quiz_manage') }}" class="btn btn-ghost">Cancel</a>
+      <button type="submit" class="btn btn-primary" style="padding:12px 32px;">🚀 Publish Quiz</button>
+    </div>
+  </form>
+</div>
+
+<script>
+let qCount = 0;
+const LABELS = ['a','b','c','d'];
+
+function addQuestion() {
+  qCount++;
+  const c = document.getElementById('questionsContainer');
+  const d = document.createElement('div');
+  d.className = 'q-block';
+  d.id = `qb_${qCount}`;
+  d.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.95rem;color:var(--accent);">Question ${qCount}</span>
+      <button type="button" onclick="document.getElementById('qb_${qCount}').remove()"
+              class="btn btn-ghost btn-sm" style="color:var(--text-3);">✕ Remove</button>
+    </div>
+
+    <div class="form-group">
+      <label>Question</label>
+      <input class="form-input" type="text" name="q_text[]" placeholder="Enter question text…" required>
+    </div>
+
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;">
+      <div class="form-group">
+        <label>Type</label>
+        <select class="form-select" name="q_type[]" onchange="handleType(this,${qCount})"
+                style="width:100%;padding:11px 14px;">
+          <option value="MCQ">Multiple Choice (MCQ)</option>
+          <option value="TEXT">Short / Descriptive Answer</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Marks</label>
+        <input class="form-input" type="number" name="q_marks[]" value="1" min="1" required>
+      </div>
+    </div>
+
+    <div id="opts_${qCount}">
+      <label class="form-label" style="font-size:0.78rem;font-weight:600;color:var(--text-2);margin-bottom:8px;display:block;">Options</label>
+      <div id="opts_list_${qCount}">
+        <div class="option-row"><span class="option-letter">a)</span><input class="form-input" type="text" name="q_options_${qCount}[]" placeholder="Option A" required></div>
+        <div class="option-row"><span class="option-letter">b)</span><input class="form-input" type="text" name="q_options_${qCount}[]" placeholder="Option B" required></div>
+      </div>
+      <button type="button" onclick="addOpt(${qCount})"
+              class="btn btn-ghost btn-sm" style="margin-top:6px;font-size:0.78rem;">+ Option</button>
+    </div>
+
+    <div class="form-group" style="margin-top:14px;">
+      <label id="ans_lbl_${qCount}">Correct Answer <span style="color:var(--text-3);font-weight:400;">(type: a, b, c, or d)</span></label>
+      <input class="form-input" type="text" name="q_ans[]" id="ans_inp_${qCount}" placeholder="e.g., a" required>
+    </div>
+  `;
+  c.appendChild(d);
+}
+
+function addOpt(qId) {
+  const list = document.getElementById(`opts_list_${qId}`);
+  const n = list.children.length;
+  if (n >= 4) { alert('Maximum 4 options allowed.'); return; }
+  const d = document.createElement('div');
+  d.className = 'option-row';
+  d.innerHTML = `<span class="option-letter">${LABELS[n]})</span><input class="form-input" type="text" name="q_options_${qId}[]" placeholder="Option ${LABELS[n].toUpperCase()}" required>`;
+  list.appendChild(d);
+}
+
+function handleType(sel, qId) {
+  const optsDiv = document.getElementById(`opts_${qId}`);
+  const lbl = document.getElementById(`ans_lbl_${qId}`);
+  const inp = document.getElementById(`ans_inp_${qId}`);
+  if (sel.value === 'TEXT') {
+    optsDiv.style.display = 'none';
+    optsDiv.querySelectorAll('input').forEach(i => i.removeAttribute('required'));
+    lbl.innerHTML = 'Expected Answer / Key Phrase <span style="color:var(--text-3);font-weight:400;">(for reference)</span>';
+    inp.placeholder = 'Enter the expected answer';
+  } else {
+    optsDiv.style.display = 'block';
+    optsDiv.querySelectorAll('input').forEach(i => i.setAttribute('required',''));
+    lbl.innerHTML = 'Correct Answer <span style="color:var(--text-3);font-weight:400;">(type: a, b, c, or d)</span>';
+    inp.placeholder = 'e.g., a';
+  }
+}
+
+// Start with one question
+addQuestion();
+</script>
+{% endblock %}

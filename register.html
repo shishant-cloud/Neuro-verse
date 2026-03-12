@@ -1,0 +1,49 @@
+pp{% extends "base.html" %}
+{% block title %}Register{% endblock %}
+
+{% block body %}
+<div class="auth-page">
+  <div class="auth-card">
+
+    <div class="auth-logo">
+      <div class="auth-logo-icon">LG</div>
+      <div class="auth-title">Create Account</div>
+      <div class="auth-subtitle">Join LaunchGate — free, forever</div>
+    </div>
+
+    <form class="auth-form" method="POST" action="{{ url_for('register') }}">
+      <div class="form-group">
+        <label>Username</label>
+        <input class="form-input" type="text" name="username"
+               placeholder="Choose a username" required minlength="3" autocomplete="username">
+      </div>
+
+      <div class="form-group">
+        <label>Email</label>
+        <input class="form-input" type="email" name="email"
+               placeholder="your@email.com" required autocomplete="email">
+      </div>
+
+      <div class="form-group">
+        <label>Password</label>
+        <input class="form-input" type="password" name="password"
+               placeholder="Minimum 6 characters" required minlength="6" autocomplete="new-password">
+      </div>
+
+      <div class="form-group">
+        <label>Confirm Password</label>
+        <input class="form-input" type="password" name="confirm"
+               placeholder="Repeat your password" required autocomplete="new-password">
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-lg" style="width:100%;justify-content:center;">
+        Create Account →
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      Already have an account? <a href="{{ url_for('login') }}">Sign In</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

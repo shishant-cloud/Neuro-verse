@@ -1,0 +1,964 @@
+{% extends "layout.html" %}
+{% block title %}Code Editor{% endblock %}
+{% block breadcrumb %}/ Code Editor{% endblock %}
+
+{% block content %}
+
+<!-- ── Inline styles for the editor page ────────────────────────────── -->
+<style>
+  /* Hide default main-content padding on this page so editor fills space */
+  .main-content { padding: 0 !important; }
+
+  /* ── Top bar ── */
+  .ce-topbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    background: var(--bg-raised);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .ce-title {
+    font-weight: 800;
+    font-size: 0.95rem;
+    letter-spacing: 0.02em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .ce-title-icon {
+    width: 28px; height: 28px;
+    background: var(--text);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem; color: var(--bg); font-weight: 800;
+    flex-shrink: 0;
+  }
+
+  /* Language picker */
+  .ce-lang-grid {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+  .ce-lang-btn {
+    padding: 5px 13px;
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    background: var(--bg-1);
+    color: var(--text-3);
+    cursor: pointer;
+    font-family: 'Raleway', sans-serif;
+    transition: all 0.12s;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .ce-lang-btn:hover { background: var(--bg-2); color: var(--text-2); border-color: var(--border-2); }
+  .ce-lang-btn.active {
+    background: var(--text);
+    color: var(--bg);
+    border-color: var(--text);
+  }
+
+  /* Run button */
+  .ce-run-btn {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 7px;
+    padding: 7px 20px;
+    background: #10B981;
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-family: 'Raleway', sans-serif;
+    font-size: 0.85rem; font-weight: 700;
+    cursor: pointer;
+    transition: background 0.13s, transform 0.1s;
+    flex-shrink: 0;
+  }
+  .ce-run-btn:hover   { background: #059669; }
+  .ce-run-btn:active  { transform: scale(0.97); }
+  .ce-run-btn:disabled {
+    background: var(--border-2); color: var(--text-4);
+    cursor: not-allowed; transform: none;
+  }
+  .ce-run-btn .spinner {
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.35);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Main editor layout ── */
+  .ce-layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    grid-template-rows: 1fr;
+    height: calc(100vh - var(--navbar-h) - 52px);  /* subtract topbar */
+    overflow: hidden;
+  }
+
+  /* ── Left: editor pane ── */
+  .ce-editor-pane {
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .ce-editor-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 16px;
+    background: var(--bg-1);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .ce-file-label {
+    font-size: 0.72rem; font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-3);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .ce-file-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent-2); flex-shrink: 0;
+  }
+  .ce-file-dot.modified { background: var(--accent-3); }
+
+  /* Textarea code editor */
+  #codeInput {
+    flex: 1;
+    width: 100%;
+    background: #FAFBFC;
+    color: #1F2937;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.84rem;
+    line-height: 1.75;
+    padding: 20px 24px;
+    border: none;
+    outline: none;
+    resize: none;
+    tab-size: 4;
+    letter-spacing: 0.01em;
+    overflow-y: auto;
+  }
+  #codeInput::selection { background: rgba(0,112,243,0.15); }
+  #codeInput::-webkit-scrollbar { width: 6px; }
+  #codeInput::-webkit-scrollbar-track { background: #F3F4F6; }
+  #codeInput::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 99px; }
+
+  /* Line numbers overlay (purely visual via a wrapper) */
+  .ce-editor-wrapper {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    position: relative;
+  }
+  #lineNums {
+    padding: 20px 0;
+    min-width: 48px;
+    background: #F3F4F6;
+    color: #9CA3AF;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.84rem;
+    line-height: 1.75;
+    text-align: right;
+    padding-right: 14px;
+    user-select: none;
+    overflow: hidden;
+    flex-shrink: 0;
+    border-right: 1px solid #E5E7EB;
+  }
+
+  /* ── STDIN input ── */
+  .ce-stdin-wrap {
+    flex-shrink: 0;
+    border-top: 1px solid var(--border);
+  }
+  .ce-stdin-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 16px;
+    background: var(--bg-1);
+    border-bottom: 1px solid var(--border);
+  }
+  .ce-stdin-label {
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.12em; color: var(--text-4);
+  }
+  #stdinInput {
+    width: 100%;
+    background: #F9FAFB;
+    color: #1F2937;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    line-height: 1.65;
+    padding: 10px 16px;
+    border: none;
+    outline: none;
+    resize: none;
+    height: 72px;
+  }
+  #stdinInput::placeholder { color: #9CA3AF; }
+
+  /* ── Right: output pane ── */
+  .ce-output-pane {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #F9FAFB;
+  }
+  .ce-output-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 16px;
+    background: #FFFFFF;
+    border-bottom: 1px solid #E5E7EB;
+    flex-shrink: 0;
+  }
+  .ce-output-title {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.12em; color: #6B7280;
+  }
+  .ce-status-badge {
+    margin-left: auto;
+    font-size: 0.68rem; font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 2px 9px;
+    border-radius: var(--radius-full);
+    background: #F3F4F6; color: #6B7280;
+  }
+  .ce-status-badge.ok     { background: rgba(16,185,129,0.1); color: #059669; }
+  .ce-status-badge.error  { background: rgba(239,68,68,0.1); color: #DC2626; }
+  .ce-status-badge.run    { background: rgba(0,112,243,0.1); color: #0070F3; }
+
+  #outputBox {
+    flex: 1;
+    overflow-y: auto;
+    padding: 18px 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    line-height: 1.75;
+    color: #1F2937;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  #outputBox::-webkit-scrollbar { width: 5px; }
+  #outputBox::-webkit-scrollbar-track { background: #F9FAFB; }
+  #outputBox::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 99px; }
+  #outputBox .out-placeholder {
+    color: #9CA3AF; font-style: italic; font-size: 0.8rem;
+  }
+  #outputBox .out-error   { color: #DC2626; }
+  #outputBox .out-system  { color: #0070F3; font-style: italic; }
+  #outputBox .out-success { color: #059669; }
+  #outputBox .out-time    {
+    display: block; margin-top: 12px;
+    font-size: 0.68rem; color: #9CA3AF;
+    border-top: 1px solid #E5E7EB; padding-top: 8px;
+  }
+
+  /* ── Info sidebar at bottom of output ── */
+  .ce-info-bar {
+    flex-shrink: 0;
+    padding: 10px 16px;
+    background: #FFFFFF;
+    border-top: 1px solid #E5E7EB;
+    display: flex; gap: 16px; flex-wrap: wrap;
+  }
+  .ce-info-item {
+    font-size: 0.67rem; font-family: 'JetBrains Mono', monospace;
+    color: #9CA3AF; display: flex; align-items: center; gap: 5px;
+  }
+  .ce-info-item span { color: #6B7280; }
+
+  /* Snippet actions row */
+  .ce-actions {
+    display: flex; gap: 8px;
+    padding: 10px 16px;
+    background: #FFFFFF;
+    border-top: 1px solid #E5E7EB;
+    flex-shrink: 0; flex-wrap: wrap;
+  }
+  .ce-action-btn {
+    padding: 5px 13px;
+    border-radius: var(--radius-sm);
+    font-family: 'Raleway', sans-serif;
+    font-size: 0.75rem; font-weight: 600;
+    cursor: pointer;
+    border: 1px solid #E5E7EB;
+    background: #F9FAFB;
+    color: #6B7280;
+    transition: all 0.12s;
+  }
+  .ce-action-btn:hover { background: #F3F4F6; color: #111827; border-color: #D1D5DB; }
+  .ce-action-btn.save-vault {
+    background: rgba(0,112,243,0.06);
+    border-color: rgba(0,112,243,0.25);
+    color: #0070F3;
+  }
+  .ce-action-btn.save-vault:hover { background: rgba(0,112,243,0.12); }
+</style>
+
+<!-- ── TOP BAR ─────────────────────────────────────────────────────── -->
+<div class="ce-topbar">
+  <div class="ce-title">
+    <div class="ce-title-icon">{ }</div>
+    Code Editor
+  </div>
+
+  <div style="width:1px;height:22px;background:var(--border);flex-shrink:0;"></div>
+
+  <!-- Language selector -->
+  <div class="ce-lang-grid" id="langGrid">
+    <button class="ce-lang-btn active" data-lang="python"     data-version="3.10.0" data-ext="py"   onclick="setLang(this)">🐍 Python</button>
+    <button class="ce-lang-btn"        data-lang="c"          data-version="10.2.0" data-ext="c"    onclick="setLang(this)">🔵 C</button>
+    <button class="ce-lang-btn"        data-lang="c++"        data-version="10.2.0" data-ext="cpp"  onclick="setLang(this)">🔷 C++</button>
+    <button class="ce-lang-btn"        data-lang="java"       data-version="15.0.2" data-ext="java" onclick="setLang(this)">☕ Java</button>
+    <button class="ce-lang-btn"        data-lang="javascript" data-version="18.15.0" data-ext="js"  onclick="setLang(this)">⚡ JavaScript</button>
+    <button class="ce-lang-btn"        data-lang="html"       data-version="*"      data-ext="html" onclick="setLang(this)">🌐 HTML/CSS</button>
+    <button class="ce-lang-btn"        data-lang="typescript" data-version="5.0.3"  data-ext="ts"   onclick="setLang(this)">📘 TypeScript</button>
+    <button class="ce-lang-btn"        data-lang="rust"       data-version="1.68.2" data-ext="rs"   onclick="setLang(this)">🦀 Rust</button>
+    <button class="ce-lang-btn"        data-lang="go"         data-version="1.20.3" data-ext="go"   onclick="setLang(this)">🐹 Go</button>
+    <button class="ce-lang-btn"        data-lang="bash"       data-version="5.2.0"  data-ext="sh"   onclick="setLang(this)">$ Bash</button>
+  </div>
+
+  <!-- Run -->
+  <button class="ce-run-btn" id="runBtn" onclick="runCode()">
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+      <polygon points="2,1 11,6 2,11"/>
+    </svg>
+    Run
+  </button>
+</div>
+
+
+<!-- ── MAIN LAYOUT ──────────────────────────────────────────────────── -->
+<div class="ce-layout">
+
+  <!-- LEFT: Editor + stdin -->
+  <div class="ce-editor-pane">
+    <div class="ce-editor-header">
+      <div class="ce-file-label">
+        <div class="ce-file-dot" id="fileDot"></div>
+        <span id="fileLabel">main.py</span>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button class="ce-action-btn" onclick="clearEditor()" title="Clear editor">✕ Clear</button>
+        <button class="ce-action-btn" onclick="copyCode()" title="Copy code">⎘ Copy</button>
+        <button class="ce-action-btn" onclick="downloadCode()" title="Download">↓ Download</button>
+      </div>
+    </div>
+
+    <div class="ce-editor-wrapper">
+      <!-- Line numbers -->
+      <div id="lineNums">1</div>
+      <!-- Code textarea -->
+      <textarea id="codeInput" spellcheck="false"
+                autocorrect="off" autocapitalize="off"
+                placeholder="// Write your code here…"
+                oninput="onCodeInput()"
+                onkeydown="handleTabKey(event)"
+                onscroll="syncScroll()"></textarea>
+    </div>
+
+    <!-- STDIN -->
+    <div class="ce-stdin-wrap">
+      <div class="ce-stdin-header">
+        <span class="ce-stdin-label">stdin / input</span>
+        <span style="font-size:0.68rem;color:var(--text-4);">One value per line</span>
+      </div>
+      <textarea id="stdinInput" placeholder="Enter program input here (if needed)…"></textarea>
+    </div>
+  </div>
+
+
+  <!-- RIGHT: Output -->
+  <div class="ce-output-pane">
+    <div class="ce-output-header">
+      <span class="ce-output-title">Output</span>
+      <span class="ce-status-badge" id="statusBadge">Ready</span>
+    </div>
+
+    <div id="outputBox">
+      <div class="out-placeholder">Hit <kbd style="background:#E5E7EB;color:#374151;padding:1px 6px;border-radius:3px;font-style:normal;">Run</kbd> to execute your code…</div>
+    </div>
+
+    <div class="ce-info-bar">
+      <div class="ce-info-item">Lang: <span id="infoLang">Python 3.10</span></div>
+      <div class="ce-info-item">API: <span>Piston (piston.heliohost.dev)</span></div>
+      <div class="ce-info-item" id="infoTime" style="display:none;">Time: <span id="infoTimeVal">—</span></div>
+    </div>
+
+    <div class="ce-actions">
+      <button class="ce-action-btn" onclick="clearOutput()">✕ Clear output</button>
+      <button class="ce-action-btn save-vault" onclick="openShareModal()">⬡ Share to Vault</button>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ── SCRIPTS ─────────────────────────────────────────────────────── -->
+<script>
+/* ───────────────────────────────────────────────────────────────────────
+   STATE
+─────────────────────────────────────────────────────────────────────── */
+const PISTON_API = 'https://emkc.org/api/v2/piston/execute';
+
+const STARTERS = {
+  python: `# Python 3\nprint("Hello, NeuroVerse!")\n\n# Input example:\n# name = input("Enter your name: ")\n# print(f"Hello, {name}!")`,
+  c: `#include <stdio.h>\n\nint main() {\n    printf("Hello, NeuroVerse!\\n");\n    return 0;\n}`,
+  'c++': `#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << "Hello, NeuroVerse!" << endl;\n    return 0;\n}`,
+  java: `public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello, NeuroVerse!");\n    }\n}`,
+  javascript: `// JavaScript (Node.js)\nconsole.log("Hello, NeuroVerse!");\n\nconst nums = [1, 2, 3, 4, 5];\nconst sum = nums.reduce((a, b) => a + b, 0);\nconsole.log("Sum:", sum);`,
+  html: `<!DOCTYPE html>\n<html>\n<head>\n  <title>My Page</title>\n  <style>\n    body { font-family: sans-serif; padding: 24px; background: #f0f4f8; }\n    h1   { color: #0070F3; }\n  </style>\n</head>\n<body>\n  <h1>Hello, NeuroVerse!</h1>\n  <p>Edit this HTML/CSS and click Run to preview.</p>\n</body>\n</html>`,
+  typescript: `// TypeScript\nconst greet = (name: string): string => {\n  return \`Hello, \${name}!\`;\n};\n\nconsole.log(greet("NeuroVerse"));`,
+  rust: `fn main() {\n    println!("Hello, NeuroVerse!");\n}`,
+  go: `package main\n\nimport "fmt"\n\nfunc main() {\n    fmt.Println("Hello, NeuroVerse!")\n}`,
+  bash: `#!/bin/bash\necho "Hello, NeuroVerse!"\necho "Current date: $(date)"\nfor i in 1 2 3; do\n  echo "Count: $i"\ndone`,
+};
+
+const VERSIONS = {
+  python: '3.10.0', c: '10.2.0', 'c++': '10.2.0', java: '15.0.2',
+  javascript: '18.15.0', html: '*', typescript: '5.0.3',
+  rust: '1.68.2', go: '1.20.3', bash: '5.2.0',
+};
+const EXTS = {
+  python:'py', c:'c', 'c++':'cpp', java:'java', javascript:'js',
+  html:'html', typescript:'ts', rust:'rs', go:'go', bash:'sh',
+};
+
+let currentLang = 'python';
+let isRunning   = false;
+
+/* ───────────────────────────────────────────────────────────────────────
+   INIT
+─────────────────────────────────────────────────────────────────────── */
+document.getElementById('codeInput').value = STARTERS.python;
+updateLineNumbers();
+
+/* ───────────────────────────────────────────────────────────────────────
+   LANGUAGE SWITCH
+─────────────────────────────────────────────────────────────────────── */
+function setLang(btn) {
+  document.querySelectorAll('.ce-lang-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentLang = btn.dataset.lang;
+
+  // Set starter code
+  document.getElementById('codeInput').value = STARTERS[currentLang] || '';
+  document.getElementById('fileLabel').textContent = 'main.' + EXTS[currentLang];
+  document.getElementById('infoLang').textContent = btn.textContent.trim().replace(/^.+?\s/,'') + ' ' + (VERSIONS[currentLang] || '');
+  document.getElementById('fileDot').classList.remove('modified');
+
+  updateLineNumbers();
+  clearOutput();
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   LINE NUMBERS
+─────────────────────────────────────────────────────────────────────── */
+function updateLineNumbers() {
+  const code  = document.getElementById('codeInput').value;
+  const count = code.split('\n').length;
+  const nums  = document.getElementById('lineNums');
+  let html = '';
+  for (let i = 1; i <= count; i++) html += i + '\n';
+  nums.textContent = html;
+}
+
+function syncScroll() {
+  const ta = document.getElementById('codeInput');
+  document.getElementById('lineNums').scrollTop = ta.scrollTop;
+}
+
+function onCodeInput() {
+  updateLineNumbers();
+  document.getElementById('fileDot').classList.add('modified');
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   TAB KEY — insert 4 spaces instead of focus-trap
+─────────────────────────────────────────────────────────────────────── */
+function handleTabKey(e) {
+  if (e.key !== 'Tab') return;
+  e.preventDefault();
+  const ta    = e.target;
+  const start = ta.selectionStart;
+  const end   = ta.selectionEnd;
+  ta.value    = ta.value.substring(0, start) + '    ' + ta.value.substring(end);
+  ta.selectionStart = ta.selectionEnd = start + 4;
+  updateLineNumbers();
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   RUN CODE
+─────────────────────────────────────────────────────────────────────── */
+async function runCode() {
+  if (isRunning) return;
+  const code  = document.getElementById('codeInput').value.trim();
+  if (!code) { showOutput('<span class="out-system">Nothing to run.</span>'); return; }
+
+  // HTML — render in iframe instead of executing
+  if (currentLang === 'html') {
+    renderHTML(code);
+    return;
+  }
+
+  isRunning = true;
+  setRunBtn(true);
+  setBadge('run', '● Running…');
+  showOutput('<span class="out-system">⟳ Sending to Piston execution engine…</span>');
+
+  const stdin = document.getElementById('stdinInput').value;
+  const t0    = Date.now();
+
+  // Java: Piston requires filename = class name
+  let filename = 'main.' + EXTS[currentLang];
+  if (currentLang === 'java') {
+    const match = code.match(/public\s+class\s+(\w+)/);
+    if (match) filename = match[1] + '.java';
+  }
+
+  const payload = {
+    language: currentLang,
+    version:  VERSIONS[currentLang],
+    files: [{ name: filename, content: code }],
+    stdin: stdin,
+    args:  [],
+    run_timeout:     10000,
+    compile_timeout: 15000,
+  };
+
+  try {
+    const res  = await fetch(PISTON_API, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload),
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+
+    const data  = await res.json();
+    const ms    = Date.now() - t0;
+    const run   = data.run   || {};
+    const comp  = data.compile || {};
+    let html    = '';
+
+    // Compile errors (C, C++, Java, Rust, Go, TypeScript)
+    if (comp.stderr && comp.stderr.trim()) {
+      html += `<span class="out-error">── Compilation Error ──\n${esc(comp.stderr.trim())}\n</span>`;
+    }
+    if (comp.stdout && comp.stdout.trim()) {
+      html += `<span class="out-system">── Compiler output ──\n${esc(comp.stdout.trim())}\n</span>`;
+    }
+
+    // Runtime output
+    if (run.stdout && run.stdout.trim()) {
+      html += `<span class="out-success">${esc(run.stdout)}</span>`;
+    }
+    if (run.stderr && run.stderr.trim()) {
+      html += `<span class="out-error">── Runtime Error ──\n${esc(run.stderr.trim())}\n</span>`;
+    }
+    if (!html) {
+      html = '<span class="out-system">(no output)</span>';
+    }
+
+    // Exit code indicator
+    const exitOk = run.code === 0;
+    html += `<span class="out-time">exit code ${run.code ?? '?'} · ${ms}ms · ${currentLang}</span>`;
+
+    showOutput(html);
+    setBadge(exitOk ? 'ok' : 'error', exitOk ? '✓ Success' : '✕ Error');
+
+    document.getElementById('infoTime').style.display = '';
+    document.getElementById('infoTimeVal').textContent = ms + 'ms';
+
+  } catch(err) {
+    showOutput(
+      `<span class="out-error">── Network / API Error ──\n${esc(err.message)}\n\n` +
+      `Tip: Make sure you have internet access.\n` +
+      `Piston API: ${PISTON_API}</span>`
+    );
+    setBadge('error', '✕ Failed');
+  } finally {
+    isRunning = false;
+    setRunBtn(false);
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   HTML PREVIEW — render inline in output panel
+─────────────────────────────────────────────────────────────────────── */
+function renderHTML(code) {
+  const box = document.getElementById('outputBox');
+  box.innerHTML = '';
+  setBadge('ok', '👁 Preview');
+
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'width:100%;height:100%;border:none;background:#fff;';
+  iframe.sandbox = 'allow-scripts allow-same-origin';
+  box.appendChild(iframe);
+
+  const doc = iframe.contentDocument || iframe.contentWindow.document;
+  doc.open();
+  doc.write(code);
+  doc.close();
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   HELPERS
+─────────────────────────────────────────────────────────────────────── */
+function showOutput(html) {
+  document.getElementById('outputBox').innerHTML = html;
+}
+
+function clearOutput() {
+  document.getElementById('outputBox').innerHTML =
+    '<div class="out-placeholder">Hit <kbd style="background:#E5E7EB;color:#374151;padding:1px 6px;border-radius:3px;font-style:normal;">Run</kbd> to execute your code…</div>';
+  setBadge('', 'Ready');
+  document.getElementById('infoTime').style.display = 'none';
+}
+
+function setBadge(cls, text) {
+  const b = document.getElementById('statusBadge');
+  b.className = 'ce-status-badge ' + cls;
+  b.textContent = text;
+}
+
+function setRunBtn(loading) {
+  const btn = document.getElementById('runBtn');
+  if (loading) {
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div> Running…';
+  } else {
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><polygon points="2,1 11,6 2,11"/></svg> Run';
+  }
+}
+
+function esc(s) {
+  return String(s || '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;');
+}
+
+function clearEditor() {
+  if (confirm('Clear the editor?')) {
+    document.getElementById('codeInput').value = '';
+    updateLineNumbers();
+  }
+}
+
+function copyCode() {
+  navigator.clipboard.writeText(document.getElementById('codeInput').value).then(() => {
+    const btn = event.target;
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => btn.textContent = '⎘ Copy', 1600);
+  });
+}
+
+function downloadCode() {
+  const code = document.getElementById('codeInput').value;
+  const ext  = EXTS[currentLang];
+  const blob = new Blob([code], { type: 'text/plain' });
+  const a    = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(blob),
+    download: 'main.' + ext,
+  });
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ── Share Modal ── */
+function openShareModal() {
+  const code = document.getElementById('codeInput').value.trim();
+  if (!code) {
+    flashOutput('Write some code first before sharing!', 'error');
+    return;
+  }
+  // Pre-fill fields
+  document.getElementById('sm-title').value = 'My ' + currentLang.replace('c++','C++').replace('c','C') + ' snippet';
+  document.getElementById('sm-lang-badge').textContent = currentLang;
+  document.getElementById('sm-lines').textContent = code.split('\n').length + ' lines';
+  document.getElementById('sm-desc').value = '';
+  document.getElementById('sm-public').checked = true;
+  updateVisibilityLabel(true);
+
+  // Code preview (first 8 lines)
+  const preview = code.split('\n').slice(0, 8).join('\n') + (code.split('\n').length > 8 ? '\n…' : '');
+  document.getElementById('sm-preview').textContent = preview;
+
+  // Reset state
+  setShareState('idle');
+  document.getElementById('shareModal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => document.getElementById('sm-title').select(), 50);
+}
+
+function closeShareModal() {
+  document.getElementById('shareModal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function updateVisibilityLabel(pub) {
+  const lbl = document.getElementById('sm-vis-label');
+  const desc = document.getElementById('sm-vis-desc');
+  if (pub) {
+    lbl.textContent  = '🌍 Public';
+    desc.textContent = 'Visible to all teammates in the Vault';
+    lbl.style.color  = '#a6e3a1';
+  } else {
+    lbl.textContent  = '🔒 Private';
+    desc.textContent = 'Only visible to you';
+    lbl.style.color  = '#f9e2af';
+  }
+}
+
+function setShareState(state) {
+  const shareBtn = document.getElementById('sm-share-btn');
+  const status   = document.getElementById('sm-status');
+  if (state === 'idle') {
+    shareBtn.disabled = false;
+    shareBtn.innerHTML = '⬡ Share to Vault';
+    status.style.display = 'none';
+  } else if (state === 'loading') {
+    shareBtn.disabled = true;
+    shareBtn.innerHTML = '<div class="sm-spinner"></div> Sharing…';
+    status.style.display = 'none';
+  } else if (state === 'success') {
+    shareBtn.disabled = true;
+    shareBtn.innerHTML = '✓ Shared!';
+    shareBtn.style.background = 'rgba(16,185,129,0.08)';
+    shareBtn.style.borderColor = 'rgba(16,185,129,0.3)';
+    shareBtn.style.color = '#059669';
+    status.style.display = 'flex';
+    status.innerHTML = '<span style="color:#059669;font-size:0.8rem;font-weight:600;">✓ Snippet shared to Code Vault!</span>'
+      + '<a href="/vault" style="font-size:0.78rem;color:#0070F3;text-decoration:none;font-weight:600;margin-left:8px;">View Vault →</a>';
+  } else if (state === 'error') {
+    shareBtn.disabled = false;
+    shareBtn.innerHTML = '↺ Try again';
+    status.style.display = 'flex';
+    status.innerHTML = '<span style="color:#DC2626;font-size:0.8rem;">Failed to save. Please try again.</span>';
+  }
+}
+
+async function submitShare() {
+  const title = document.getElementById('sm-title').value.trim();
+  const desc  = document.getElementById('sm-desc').value.trim();
+  const pub   = document.getElementById('sm-public').checked;
+  const code  = document.getElementById('codeInput').value.trim();
+
+  if (!title) {
+    document.getElementById('sm-title').focus();
+    document.getElementById('sm-title').style.borderColor = '#EF4444';
+    setTimeout(() => document.getElementById('sm-title').style.borderColor = '', 1500);
+    return;
+  }
+
+  setShareState('loading');
+
+  try {
+    const res  = await fetch('/api/vault/save', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        title,
+        language: currentLang === 'c++' ? 'cpp' : currentLang,
+        code,
+        description: desc,
+        is_public: pub,
+      }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      setShareState('success');
+    } else {
+      setShareState('error');
+    }
+  } catch(e) {
+    setShareState('error');
+  }
+}
+
+function flashOutput(msg, type) {
+  const box = document.getElementById('outputBox');
+  const cls = type === 'error' ? 'out-error' : 'out-system';
+  box.innerHTML = `<span class="${cls}">${msg}</span>`;
+}
+
+// Ctrl+Enter = Run
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    runCode();
+  }
+  if (e.key === 'Escape') closeShareModal();
+});
+
+document.getElementById('shareModal').addEventListener('click', function(e) {
+  if (e.target === this) closeShareModal();
+});
+</script>
+
+<!-- ── SHARE TO VAULT MODAL ──────────────────────────────────────────── -->
+{% block modals %}{% endblock %}
+<div id="shareModal"
+     style="display:none;position:fixed;inset:0;z-index:3000;
+            background:rgba(0,0,0,0.65);backdrop-filter:blur(6px);
+            align-items:center;justify-content:center;">
+
+  <div style="width:min(94vw,560px);background:#FFFFFF;border:1px solid #E5E7EB;
+              border-radius:14px;overflow:hidden;
+              box-shadow:0 32px 80px rgba(0,0,0,0.5);">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;
+                padding:16px 20px;border-bottom:1px solid #E5E7EB;background:#F9FAFB;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:30px;height:30px;background:linear-gradient(135deg,#0070F3,#10B981);
+                    border-radius:7px;display:flex;align-items:center;justify-content:center;
+                    font-size:0.8rem;font-weight:800;color:#fff;">⬡</div>
+        <div>
+          <div style="font-weight:700;font-size:0.92rem;color:#111827;">Share to Code Vault</div>
+          <div style="font-size:0.68rem;color:#6B7280;margin-top:1px;">Publish your snippet for teammates</div>
+        </div>
+      </div>
+      <button onclick="closeShareModal()"
+              style="width:28px;height:28px;border-radius:5px;background:transparent;
+                     border:1px solid #E5E7EB;color:#6B7280;cursor:pointer;
+                     font-size:0.9rem;display:flex;align-items:center;justify-content:center;
+                     transition:all 0.12s;"
+              onmouseover="this.style.background='#F3F4F6';this.style.color='#111827'"
+              onmouseout="this.style.background='transparent';this.style.color='#6B7280'">✕</button>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:20px;">
+
+      <!-- Code preview strip -->
+      <div style="background:#F8FAFC;border:1px solid #E5E7EB;border-radius:8px;
+                  overflow:hidden;margin-bottom:18px;">
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 14px;
+                    background:#F1F5F9;border-bottom:1px solid #E5E7EB;">
+          <div style="display:flex;gap:5px;">
+            <div style="width:10px;height:10px;border-radius:50%;background:#f38ba8;"></div>
+            <div style="width:10px;height:10px;border-radius:50%;background:#f9e2af;"></div>
+            <div style="width:10px;height:10px;border-radius:50%;background:#a6e3a1;"></div>
+          </div>
+          <span id="sm-lang-badge"
+                style="font-size:0.68rem;font-weight:600;font-family:'JetBrains Mono',monospace;
+                       color:#6B7280;background:#E5E7EB;padding:1px 8px;border-radius:3px;"></span>
+          <span id="sm-lines"
+                style="font-size:0.65rem;color:#9CA3AF;font-family:'JetBrains Mono',monospace;
+                       margin-left:auto;"></span>
+        </div>
+        <pre id="sm-preview"
+             style="margin:0;padding:12px 16px;font-family:'JetBrains Mono',monospace;
+                    font-size:0.75rem;line-height:1.7;color:#374151;
+                    white-space:pre;overflow:hidden;max-height:130px;"></pre>
+      </div>
+
+      <!-- Title -->
+      <div style="margin-bottom:14px;">
+        <label style="display:block;font-size:0.68rem;font-weight:700;text-transform:uppercase;
+                      letter-spacing:0.12em;color:#6B7280;margin-bottom:6px;">Title *</label>
+        <input id="sm-title" type="text" placeholder="Give your snippet a clear name…"
+               onkeydown="if(event.key==='Enter') submitShare()"
+               style="width:100%;background:#FFFFFF;border:1px solid #E5E7EB;border-radius:7px;
+                      padding:9px 13px;color:#111827;font-family:'Raleway',sans-serif;
+                      font-size:0.875rem;font-weight:500;outline:none;transition:border-color 0.12s;">
+      </div>
+
+      <!-- Description -->
+      <div style="margin-bottom:16px;">
+        <label style="display:block;font-size:0.68rem;font-weight:700;text-transform:uppercase;
+                      letter-spacing:0.12em;color:#6B7280;margin-bottom:6px;">
+          Description <span style="color:#9CA3AF;font-weight:400;text-transform:none;">(optional)</span>
+        </label>
+        <textarea id="sm-desc" rows="2" placeholder="What does this snippet do?"
+                  style="width:100%;background:#FFFFFF;border:1px solid #E5E7EB;border-radius:7px;
+                         padding:9px 13px;color:#111827;font-family:'Raleway',sans-serif;
+                         font-size:0.84rem;resize:none;outline:none;line-height:1.55;
+                         transition:border-color 0.12s;"></textarea>
+      </div>
+
+      <!-- Visibility toggle -->
+      <div style="display:flex;align-items:center;gap:14px;padding:12px 14px;
+                  background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;margin-bottom:18px;">
+        <label style="position:relative;width:40px;height:22px;flex-shrink:0;cursor:pointer;">
+          <input type="checkbox" id="sm-public" checked
+                 onchange="updateVisibilityLabel(this.checked)"
+                 style="opacity:0;width:0;height:0;position:absolute;">
+          <span id="sm-toggle-track"
+                style="position:absolute;inset:0;border-radius:99px;background:#0070F3;
+                       transition:background 0.18s;"
+                onclick="
+                  const cb=document.getElementById('sm-public');
+                  const track=document.getElementById('sm-toggle-track');
+                  const thumb=document.getElementById('sm-toggle-thumb');
+                  cb.checked=!cb.checked;
+                  track.style.background=cb.checked?'#0070F3':'#D1D5DB';
+                  thumb.style.left=cb.checked?'20px':'2px';
+                  updateVisibilityLabel(cb.checked);
+                "></span>
+          <span id="sm-toggle-thumb"
+                style="position:absolute;top:2px;left:20px;width:18px;height:18px;
+                       border-radius:50%;background:#fff;transition:left 0.18s;
+                       pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></span>
+        </label>
+        <div>
+          <div id="sm-vis-label"
+               style="font-size:0.82rem;font-weight:700;color:#059669;">🌍 Public</div>
+          <div id="sm-vis-desc"
+               style="font-size:0.7rem;color:#6B7280;margin-top:1px;">Visible to all teammates in the Vault</div>
+        </div>
+      </div>
+
+      <!-- Status message -->
+      <div id="sm-status"
+           style="display:none;align-items:center;gap:8px;
+                  padding:10px 14px;background:#F0FDF4;border:1px solid #D1FAE5;
+                  border-radius:7px;margin-bottom:14px;flex-wrap:wrap;"></div>
+
+      <!-- Footer buttons -->
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button onclick="closeShareModal()"
+                style="padding:8px 18px;border-radius:7px;background:transparent;
+                       border:1px solid #E5E7EB;color:#6B7280;cursor:pointer;
+                       font-family:'Raleway',sans-serif;font-size:0.83rem;font-weight:600;
+                       transition:all 0.12s;"
+                onmouseover="this.style.background='#F3F4F6';this.style.color='#111827'"
+                onmouseout="this.style.background='transparent';this.style.color='#6B7280'">
+          Cancel
+        </button>
+        <button id="sm-share-btn" onclick="submitShare()"
+                style="padding:8px 22px;border-radius:7px;
+                       background:linear-gradient(135deg,#0070F3,#0ea5e9);
+                       border:1px solid rgba(0,112,243,0.4);color:#fff;cursor:pointer;
+                       font-family:'Raleway',sans-serif;font-size:0.83rem;font-weight:700;
+                       display:flex;align-items:center;gap:7px;
+                       transition:all 0.12s;">
+          ⬡ Share to Vault
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<style>
+  .sm-spinner {
+    width:13px;height:13px;border:2px solid rgba(255,255,255,0.3);
+    border-top-color:#fff;border-radius:50%;
+    animation:spin 0.6s linear infinite;display:inline-block;
+  }
+  #sm-title:focus, #sm-desc:focus {
+    border-color:#0070F3;box-shadow:0 0 0 3px rgba(0,112,243,0.12);
+  }
+</style>
+
+{% endblock %}

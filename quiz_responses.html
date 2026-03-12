@@ -1,0 +1,103 @@
+{% extends "layout.html" %}
+{% block title %}Responses — {{ quiz.title }}{% endblock %}
+{% block breadcrumb %}/ Quiz Portal / Responses{% endblock %}
+
+{% block content %}
+<div class="page-header flex items-center justify-between">
+  <div>
+    <div class="page-title">📊Submissions</div>
+    <div class="page-subtitle">{{ quiz.title }} — {{ responses|length }} submission{{ 's' if responses|length != 1 }}</div>
+  </div>
+  <a href="{{ url_for('quiz_manage') }}" class="btn btn-ghost">← Manage</a>
+</div>
+
+{% if responses %}
+<div class="card" style="padding:0;overflow:hidden;">
+  <div class="data-table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Student</th>
+          <th>Score</th>
+          <th>Grade</th>
+          <th>Submitted</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for res in responses %}
+        <tr>
+          <td style="color:var(--text-3);">{{ loop.index }}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div class="user-avatar" style="width:28px;height:28px;font-size:0.72rem;flex-shrink:0;">{{ res.username[0].upper() }}</div>
+              <span style="font-weight:600;">{{ res.username }}</span>
+            </div>
+          </td>
+          <td>
+            <strong>{{ res.score }} / {{ res.total_marks }}</strong>
+          </td>
+          <td>
+            {% if res.total_marks > 0 %}
+              {% set pct = (res.score / res.total_marks * 100)|int %}
+              <div style="display:flex;align-items:center;gap:8px;">
+                <div style="width:80px;height:6px;background:var(--bg-raised);border-radius:3px;overflow:hidden;">
+                  <div style="height:100%;width:{{ pct }}%;background:{% if pct>=70 %}#34d399{% elif pct>=40 %}#fbbf24{% else %}#f87171{% endif %};border-radius:3px;"></div>
+                </div>
+                <span class="badge {% if pct>=70 %}badge-green{% elif pct>=40 %}badge-amber{% else %}badge-red{% endif %}">{{ pct }}%</span>
+              </div>
+            {% else %}—{% endif %}
+          </td>
+          <td style="color:var(--text-3);font-size:0.8rem;">{{ res.submitted_at[:16] if res.submitted_at else '—' }}</td>
+          <td>
+            <a href="{{ url_for('quiz_review', resp_id=res.id) }}" class="btn btn-ghost btn-sm">
+              View Paper →
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Class Summary -->
+{% if responses %}
+<div class="card" style="margin-top:20px;">
+  <div style="font-size:0.75rem;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:16px;">Class Summary</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;">
+    {% set scores = [] %}
+    {% for r in responses if r.total_marks > 0 %}
+      {% set _ = scores.append((r.score / r.total_marks * 100)|int) %}
+    {% endfor %}
+    <div style="text-align:center;padding:16px;background:var(--bg-raised);border-radius:var(--radius);">
+      <div style="font-family:'Syne',sans-serif;font-size:1.8rem;font-weight:800;color:var(--accent);">{{ responses|length }}</div>
+      <div style="font-size:0.75rem;color:var(--text-2);margin-top:4px;">Submissions</div>
+    </div>
+    {% if scores %}
+    <div style="text-align:center;padding:16px;background:var(--bg-raised);border-radius:var(--radius);">
+      <div style="font-family:'Syne',sans-serif;font-size:1.8rem;font-weight:800;color:#34d399;">{{ (scores|sum / scores|length)|int }}%</div>
+      <div style="font-size:0.75rem;color:var(--text-2);margin-top:4px;">Class Average</div>
+    </div>
+    <div style="text-align:center;padding:16px;background:var(--bg-raised);border-radius:var(--radius);">
+      <div style="font-family:'Syne',sans-serif;font-size:1.8rem;font-weight:800;color:#fbbf24;">{{ scores|max }}%</div>
+      <div style="font-size:0.75rem;color:var(--text-2);margin-top:4px;">Highest</div>
+    </div>
+    <div style="text-align:center;padding:16px;background:var(--bg-raised);border-radius:var(--radius);">
+      <div style="font-family:'Syne',sans-serif;font-size:1.8rem;font-weight:800;color:#f87171;">{{ scores|min }}%</div>
+      <div style="font-size:0.75rem;color:var(--text-2);margin-top:4px;">Lowest</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% else %}
+<div class="card" style="text-align:center;padding:60px;">
+  <div style="font-size:3rem;margin-bottom:16px;">📭</div>
+  <div style="font-size:1rem;font-weight:600;margin-bottom:8px;">No submissions yet</div>
+  <div style="font-size:0.85rem;color:var(--text-2);">Students haven't attempted this quiz yet.</div>
+</div>
+{% endif %}
+{% endblock %}
