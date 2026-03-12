@@ -1,0 +1,51 @@
+<div class="chat-panel" id="chatPanel">
+  <div class="chat-header">
+    <div class="flex items-center" style="gap: 10px;">
+      <span style="font-size: 1.2rem;">💬</span>
+      <span class="chat-header-title">Social Hub</span>
+    </div>
+    <button class="btn-icon-ghost" id="chatClose" style="margin-left: auto;" title="Close Hub">✕</button>
+  </div>
+
+  <!-- User list — populated by app.js loadUsers() -->
+  <div class="chat-users" id="chatUserList">
+    <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-3);
+                text-transform: uppercase; letter-spacing: 0.1em;
+                padding: 12px 16px 8px;">
+      Online Teammates
+    </div>
+  </div>
+
+  <!-- Message area — populated by app.js renderMessages() -->
+  <div class="chat-messages" id="chatMessages">
+    <div style="text-align: center; padding: 40px 20px;
+                color: var(--text-3); font-size: 0.85rem;">
+      <div style="font-size: 2rem; margin-bottom: 12px;">🛰️</div>
+      Select a contact to begin a real-time encrypted session.
+    </div>
+  </div>
+
+  <!-- Input row -->
+  <div class="chat-input-row">
+    <textarea
+      class="chat-input"
+      id="chatInput"
+      placeholder="Type a message…"
+      rows="1"
+      disabled
+    ></textarea>
+    <button class="btn btn-primary btn-sm" id="chatSend" disabled
+            style="padding: 10px 14px; flex-shrink: 0;">
+      ↑
+    </button>
+  </div>
+</div>
+
+<!-- Floating action button -->
+<button class="chat-toggle {% if unread and unread > 0 %}has-unread{% endif %}"
+        id="chatFab" title="Open Social Hub">
+  <span style="position: relative;">
+    💬
+    <span class="chat-unread-dot"></span>
+  </span>
+</button>
