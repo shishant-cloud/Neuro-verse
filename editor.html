@@ -1,0 +1,445 @@
+{% extends "base.html" %}
+{% block title %}Editor{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<style>
+  body { overflow: hidden; }
+
+  .editor-outer {
+    display: flex;
+    height: 100vh;
+    padding-top: var(--navbar-h);
+    margin-left: var(--sidebar-w);
+  }
+</style>
+{% endblock %}
+
+{% block body %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="flash-container" id="flashContainer">
+  {% for category, message in messages %}
+  <div class="flash flash-{{ category }}">
+    <span>{% if category == 'success' %}✓{% else %}✕{% endif %}</span>
+    <span>{{ message }}</span>
+    <button class="flash-close" onclick="this.parentElement.remove()">✕</button>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="width:34px;height:34px;background:linear-gradient(135deg,#4f8ef7,#34d399);border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:1rem;color:#fff;flex-shrink:0;">L</div>
+      <span class="sidebar-logo-text">Launch<span>Gate</span></span>
+    </div>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Navigation</div>
+    <nav class="sidebar-nav">
+      <a href="{{ url_for('dashboard') }}" class="sidebar-link">
+        <span class="link-icon">⊞</span> Dashboard
+      </a>
+      <a href="{{ url_for('editor') }}" class="sidebar-link active">
+        <span class="link-icon"></span> Word Processor
+      </a>
+      <a href="{{ url_for('vault') }}" class="sidebar-link">
+        <span class="link-icon">⬡</span> Code Vault
+      </a>
+    </nav>
+  </div>
+  <div class="sidebar-section" style="margin-top:12px;">
+    <div class="sidebar-section-label">My Documents</div>
+    <nav class="sidebar-nav" id="docSidebarList">
+      <div style="font-size:0.78rem;color:var(--text-3);padding:6px 8px;">Loading…</div>
+    </nav>
+  </div>
+  <div class="sidebar-footer">
+    <div class="sidebar-user">
+      <div class="user-avatar" style="width:34px;height:34px;font-size:0.8rem;flex-shrink:0;">
+        {{ session.username[0].upper() }}
+      </div>
+      <div class="sidebar-user-info">
+        <div class="sidebar-user-name">{{ session.username }}</div>
+        <div class="sidebar-user-role">Writer</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- NAVBAR -->
+<header class="navbar" style="padding-left:calc(var(--sidebar-w) + 20px);">
+  <div class="navbar-brand">
+    <input type="text" id="docTitle" value="{{ doc.title if doc else 'Untitled Document' }}"
+           style="background:transparent;border:none;font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;color:var(--text);width:260px;border-bottom:1px solid transparent;"
+           onfocus="this.style.borderBottomColor='var(--accent)'"
+           onblur="this.style.borderBottomColor='transparent'">
+  </div>
+
+  <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
+    <div class="save-indicator" id="saveIndicator">
+      <div class="save-dot" id="saveDot"></div>
+      <span style="font-size:0.75rem;color:var(--text-3);" id="saveText">Saved</span>
+    </div>
+    <button class="btn btn-ghost btn-sm" id="exportPdfBtn">⬇ Export PDF</button>
+    <button class="btn btn-primary btn-sm" id="saveBtn">💾 Save</button>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-ghost btn-sm">✕ Close</a>
+  </div>
+</header>
+
+<!-- EDITOR OUTER -->
+<div class="editor-outer">
+  <!-- TOOLBAR -->
+  <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+
+    <div class="editor-toolbar" id="toolbar">
+      <!-- Text formatting -->
+      <button class="toolbar-btn" onclick="fmt('bold')" title="Bold (Ctrl+B)"><b>B</b></button>
+      <button class="toolbar-btn" onclick="fmt('italic')" title="Italic (Ctrl+I)"><i>I</i></button>
+      <button class="toolbar-btn" onclick="fmt('underline')" title="Underline (Ctrl+U)"><u>U</u></button>
+      <button class="toolbar-btn" onclick="fmt('strikeThrough')" title="Strikethrough">S̶</button>
+
+      <div class="toolbar-sep"></div>
+
+      <!-- Font family -->
+      <select class="toolbar-select" onchange="setFont(this.value)" title="Font">
+        <option value="Times New Roman">Times New Roman</option>
+        <option value="Arial">Arial</option>
+        <option value="Georgia">Georgia</option>
+        <option value="Courier New">Courier New</option>
+        <option value="Trebuchet MS">Trebuchet MS</option>
+        <option value="Verdana">Verdana</option>
+      </select>
+
+      <input class="toolbar-font-size" type="number" id="fontSize" value="12" min="6" max="96"
+             onchange="setFontSize(this.value)" title="Font size (pt)">
+
+      <div class="toolbar-sep"></div>
+
+      <!-- Colour -->
+      <input type="color" id="textColor" value="#1a1a1a" title="Text color"
+             style="width:30px;height:28px;border:1px solid var(--border-2);border-radius:6px;padding:2px;background:transparent;cursor:pointer;"
+             oninput="setTextColor(this.value)">
+      <input type="color" id="bgColor" value="#ffffff" title="Highlight color"
+             style="width:30px;height:28px;border:1px solid var(--border-2);border-radius:6px;padding:2px;background:transparent;cursor:pointer;"
+             oninput="setHighlight(this.value)">
+
+      <div class="toolbar-sep"></div>
+
+      <!-- Alignment -->
+      <button class="toolbar-btn" onclick="fmt('justifyLeft')" title="Align left">⇤</button>
+      <button class="toolbar-btn" onclick="fmt('justifyCenter')" title="Center">≡</button>
+      <button class="toolbar-btn" onclick="fmt('justifyRight')" title="Align right">⇥</button>
+      <button class="toolbar-btn" onclick="fmt('justifyFull')" title="Justify">≣</button>
+
+      <div class="toolbar-sep"></div>
+
+      <!-- Lists -->
+      <button class="toolbar-btn" onclick="fmt('insertUnorderedList')" title="Bullet list">•≡</button>
+      <button class="toolbar-btn" onclick="fmt('insertOrderedList')" title="Numbered list">1≡</button>
+
+      <div class="toolbar-sep"></div>
+
+      <!-- Heading -->
+      <select class="toolbar-select" onchange="setHeading(this.value)" title="Paragraph style">
+        <option value="p">Paragraph</option>
+        <option value="h1">Heading 1</option>
+        <option value="h2">Heading 2</option>
+        <option value="h3">Heading 3</option>
+        <option value="blockquote">Blockquote</option>
+      </select>
+
+      <div class="toolbar-sep"></div>
+
+      <!-- Table -->
+      <button class="toolbar-btn" onclick="showTableModal()" title="Insert table">⊞ Table</button>
+      <button class="toolbar-btn" onclick="insertHR()" title="Horizontal rule">— HR</button>
+
+      <div class="toolbar-sep"></div>
+
+      <!-- Image & Link -->
+      <button class="toolbar-btn" onclick="insertLink()" title="Insert link">🔗</button>
+
+      <div class="toolbar-sep"></div>
+
+      <button class="toolbar-btn" onclick="clearFormat()" title="Clear formatting">T✕</button>
+    </div>
+
+    <!-- WRITING AREA -->
+    <div class="editor-main" id="editorMain">
+      <div class="writing-sheet" id="editor" contenteditable="true" spellcheck="true">
+        {%- if doc and doc.content -%}
+          {{ doc.content|safe }}
+        {%- endif -%}
+      </div>
+      <div class="editor-status">
+        <div class="save-indicator">
+          <div class="save-dot" id="statusDot"></div>
+          <span id="statusText">Ready</span>
+        </div>
+        <span>|</span>
+        <span id="wordCount">0 words</span>
+        <span>|</span>
+        <span id="charCount">0 chars</span>
+        <span>|</span>
+        <span>A4 — LaunchGate Editor</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- TABLE INSERT MODAL -->
+<div class="modal-overlay" id="tableModal">
+  <div class="modal" style="width:320px;">
+    <div class="modal-header">
+      <span class="modal-title">Insert Table</span>
+      <button class="modal-close" onclick="closeModal('tableModal')">✕</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      <div class="form-group">
+        <label>Rows</label>
+        <input class="form-input" type="number" id="tblRows" value="3" min="1" max="30">
+      </div>
+      <div class="form-group">
+        <label>Columns</label>
+        <input class="form-input" type="number" id="tblCols" value="3" min="1" max="15">
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <input type="checkbox" id="tblHeader" checked style="cursor:pointer;">
+        <label for="tblHeader" style="cursor:pointer;">Include header row</label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('tableModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="doInsertTable()">Insert Table</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.7.1/jspdf.plugin.autotable.min.js"></script>
+
+<script>
+const DOC_ID = {% if doc %}{{ doc.id }}{% else %}null{% endif %};
+let currentDocId = DOC_ID;
+let saveTimeout = null;
+let isDirty = false;
+
+const editor    = document.getElementById('editor');
+const docTitle  = document.getElementById('docTitle');
+const saveDot   = document.getElementById('saveDot');
+const saveText  = document.getElementById('saveText');
+const statusDot = document.getElementById('statusDot');
+const statusTxt = document.getElementById('statusText');
+
+// ── Formatting helpers ────────────────────────────────────────────
+function fmt(cmd, val = null) {
+  editor.focus();
+  document.execCommand(cmd, false, val);
+  scheduleAutoSave();
+}
+
+function setFont(f)  { editor.focus(); document.execCommand('fontName', false, f); }
+function setFontSize(s) {
+  // execCommand fontSize only takes 1-7, so use a span approach
+  editor.focus();
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount > 0) {
+    const range = sel.getRangeAt(0);
+    if (!range.collapsed) {
+      const span = document.createElement('span');
+      span.style.fontSize = s + 'pt';
+      range.surroundContents(span);
+    }
+  }
+}
+function setTextColor(c) { fmt('foreColor', c); }
+function setHighlight(c) { fmt('hiliteColor', c); }
+function clearFormat()   { fmt('removeFormat'); }
+
+function setHeading(tag) {
+  editor.focus();
+  document.execCommand('formatBlock', false, tag);
+}
+
+function insertHR() {
+  editor.focus();
+  document.execCommand('insertHTML', false, '<hr style="border:none;border-top:2px solid #ccc;margin:16px 0;">');
+}
+
+function insertLink() {
+  const url = prompt('Enter URL:', 'https://');
+  if (url) fmt('createLink', url);
+}
+
+// ── Table insertion ───────────────────────────────────────────────
+function showTableModal() {
+  document.getElementById('tableModal').classList.add('active');
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('active');
+}
+
+function doInsertTable() {
+  const rows    = parseInt(document.getElementById('tblRows').value) || 3;
+  const cols    = parseInt(document.getElementById('tblCols').value) || 3;
+  const header  = document.getElementById('tblHeader').checked;
+
+  let html = '<table style="width:100%;border-collapse:collapse;margin:10px 0;">';
+  for (let r = 0; r < rows; r++) {
+    html += '<tr>';
+    for (let c = 0; c < cols; c++) {
+      if (r === 0 && header) {
+        html += `<th style="border:1px solid #ccc;padding:8px 12px;background:#f5f5f5;font-weight:600;">Header ${c+1}</th>`;
+      } else {
+        html += `<td style="border:1px solid #ccc;padding:8px 12px;">Cell</td>`;
+      }
+    }
+    html += '</tr>';
+  }
+  html += '</table><p><br></p>';
+
+  editor.focus();
+  document.execCommand('insertHTML', false, html);
+  closeModal('tableModal');
+  scheduleAutoSave();
+}
+
+// ── Save ─────────────────────────────────────────────────────────
+function markDirty() {
+  isDirty = true;
+  saveDot.classList.add('unsaved');
+  saveText.textContent = 'Unsaved';
+  statusDot.classList.add('unsaved');
+  statusTxt.textContent = 'Unsaved changes';
+  scheduleAutoSave();
+  updateCounts();
+}
+
+function scheduleAutoSave() {
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(saveDoc, 2500);
+}
+
+async function saveDoc() {
+  const title   = docTitle.value.trim() || 'Untitled Document';
+  const content = editor.innerHTML;
+
+  try {
+    const res = await fetch('/api/document/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, content, doc_id: currentDocId })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      currentDocId = data.doc_id;
+      isDirty = false;
+      saveDot.classList.remove('unsaved');
+      saveText.textContent = 'Saved';
+      statusDot.classList.remove('unsaved');
+      statusTxt.textContent = 'All changes saved';
+      loadDocList();
+    }
+  } catch(e) {
+    saveText.textContent = 'Save failed!';
+  }
+}
+
+// ── Word & char count ─────────────────────────────────────────────
+function updateCounts() {
+  const text  = editor.innerText || '';
+  const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+  document.getElementById('wordCount').textContent = words + ' words';
+  document.getElementById('charCount').textContent = text.length + ' chars';
+}
+
+// ── PDF Export ───────────────────────────────────────────────────
+document.getElementById('exportPdfBtn').addEventListener('click', exportPDF);
+
+async function exportPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+
+  const title = docTitle.value.trim() || 'Document';
+  doc.setFontSize(18);
+  doc.setFont('times', 'bold');
+  doc.text(title, 20, 20);
+
+  // Find tables in editor
+  const tables = editor.querySelectorAll('table');
+  let yPos = 32;
+
+  // Process text nodes before/between/after tables
+  const clone = editor.cloneNode(true);
+  // Remove tables from clone for text extraction
+  clone.querySelectorAll('table').forEach(t => t.remove());
+  const textContent = clone.innerText;
+
+  if (textContent.trim()) {
+    doc.setFontSize(11);
+    doc.setFont('times', 'normal');
+    const lines = doc.splitTextToSize(textContent, 170);
+    doc.text(lines, 20, yPos);
+    yPos += (lines.length * 5.5) + 8;
+  }
+
+  // Export tables
+  tables.forEach((table, idx) => {
+    if (yPos > 260) { doc.addPage(); yPos = 20; }
+
+    const headers = [];
+    const rows    = [];
+
+    table.querySelectorAll('tr').forEach((tr, i) => {
+      const cells = Array.from(tr.querySelectorAll('th,td')).map(c => c.innerText.trim());
+      if (i === 0 && tr.querySelector('th')) {
+        headers.push(cells);
+      } else {
+        rows.push(cells);
+      }
+    });
+
+    doc.autoTable({
+      head: headers.length ? headers : undefined,
+      body: rows,
+      startY: yPos,
+      margin: { left: 20, right: 20 },
+      styles: { font: 'times', fontSize: 10 },
+      headStyles: { fillColor: [50, 100, 200] },
+      theme: 'striped'
+    });
+
+    yPos = doc.lastAutoTable.finalY + 10;
+  });
+
+  doc.save((title.replace(/\s+/g,'_') || 'document') + '.pdf');
+}
+
+// ── Load doc list for sidebar ─────────────────────────────────────
+async function loadDocList() {
+  // We'll just refresh — simple approach
+}
+
+// ── Keyboard shortcuts ────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey) {
+    if (e.key === 's') { e.preventDefault(); saveDoc(); }
+  }
+});
+
+editor.addEventListener('input', markDirty);
+docTitle.addEventListener('input', markDirty);
+
+document.getElementById('saveBtn').addEventListener('click', saveDoc);
+
+// Init counts
+updateCounts();
+</script>
+{% endblock %}

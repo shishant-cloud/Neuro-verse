@@ -1,0 +1,356 @@
+{% extends "layout.html" %}
+{% block title %}Code Vault{% endblock %}
+{% block breadcrumb %}/ Code Vault{% endblock %}
+
+{% block content %}
+<div class="page-header flex items-center justify-between" style="margin-bottom:20px;">
+  <div>
+    <div class="page-title">⬡ Source Code Vault</div>
+    <div class="page-subtitle">Store, browse, and share code snippets with the community.</div>
+  </div>
+  <button class="btn btn-primary" onclick="openModal('addSnippetModal')">+ New Snippet</button>
+</div>
+
+<!-- Filter + Search Bar -->
+<div class="filter-bar">
+  <form method="GET" action="{{ url_for('vault') }}" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    <input class="form-input" name="q" value="{{ search }}" placeholder="Search snippets…"
+           style="width:220px;padding:8px 14px;font-size:0.88rem;">
+    <button type="submit" class="btn btn-primary btn-sm">Search</button>
+    <a href="{{ url_for('vault') }}" class="btn btn-ghost btn-sm">Clear</a>
+  </form>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;">
+    <a href="{{ url_for('vault') }}" class="filter-btn {% if not filter_lang %}active{% endif %}">All</a>
+    {% for lang in ['python','javascript','html','css','sql','bash','java','cpp','rust','go'] %}
+    <a href="{{ url_for('vault', lang=lang) }}" class="filter-btn {% if filter_lang == lang %}active{% endif %}">{{ lang }}</a>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- TABS -->
+<div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:24px;">
+  <button class="toolbar-btn active" id="tabPublic" onclick="switchTab('public')"
+          style="border-radius:0;border-bottom:2px solid var(--accent);">Public Snippets</button>
+  <button class="toolbar-btn" id="tabMine" onclick="switchTab('mine')"
+          style="border-radius:0;">My Snippets</button>
+</div>
+
+<!-- PUBLIC SNIPPETS -->
+<div id="panelPublic" class="vault-grid">
+  {% for s in snippets %}
+  <div class="snippet-card">
+    <div class="snippet-header">
+      <div class="snippet-title">
+        <div class="snippet-title-text">{{ s.title }}</div>
+      </div>
+      <span class="badge badge-blue">{{ s.language }}</span>
+    </div>
+    <div class="snippet-body">
+      <pre class="code-block" id="code-{{ s.id }}">{{ s.code }}</pre>
+      <!-- Actions: copy + expand -->
+      <div style="position:absolute;top:8px;right:8px;display:flex;gap:5px;opacity:0;transition:opacity 0.15s;"
+           class="snippet-actions">
+        <button class="copy-btn" style="position:static;opacity:1;"
+                onclick="copyCode('code-{{ s.id }}', this)">Copy</button>
+        <button class="copy-btn" style="position:static;opacity:1;"
+                onclick="openFullscreen('{{ s.title|e }}', '{{ s.language }}', 'code-{{ s.id }}')">⤢ View</button>
+      </div>
+    </div>
+    {% if s.description %}
+    <div style="padding:10px 18px;font-size:0.8rem;color:var(--text-2);">{{ s.description }}</div>
+    {% endif %}
+    <div class="snippet-footer">
+      <span>👤 {{ s.username }}</span>
+      <span>📅 {{ s.created_at[:10] }}</span>
+      {% if s.user_id == session.user_id %}
+      <button class="btn btn-danger btn-sm" style="margin-left:auto;"
+              onclick="deleteSnippet({{ s.id }}, this)">Delete</button>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+  <div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--text-3);">
+    <div style="font-size:2.5rem;margin-bottom:12px;">⬡</div>
+    <div>No snippets found. Be the first to contribute!</div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- MY SNIPPETS -->
+<div id="panelMine" class="vault-grid" style="display:none;">
+  {% for s in my_snippets %}
+  <div class="snippet-card">
+    <div class="snippet-header">
+      <div class="snippet-title">
+        <div class="snippet-title-text">{{ s.title }}</div>
+      </div>
+      <span class="badge badge-blue">{{ s.language }}</span>
+      <span class="badge {% if s.is_public %}badge-green{% else %}badge-red{% endif %}">
+        {% if s.is_public %}Public{% else %}Private{% endif %}
+      </span>
+    </div>
+    <div class="snippet-body">
+      <pre class="code-block" id="mine-{{ s.id }}">{{ s.code }}</pre>
+      <div style="position:absolute;top:8px;right:8px;display:flex;gap:5px;opacity:0;transition:opacity 0.15s;"
+           class="snippet-actions">
+        <button class="copy-btn" style="position:static;opacity:1;"
+                onclick="copyCode('mine-{{ s.id }}', this)">Copy</button>
+        <button class="copy-btn" style="position:static;opacity:1;"
+                onclick="openFullscreen('{{ s.title|e }}', '{{ s.language }}', 'mine-{{ s.id }}')">⤢ View</button>
+      </div>
+    </div>
+    {% if s.description %}
+    <div style="padding:10px 18px;font-size:0.8rem;color:var(--text-2);">{{ s.description }}</div>
+    {% endif %}
+    <div class="snippet-footer">
+      <span>📅 {{ s.created_at[:10] }}</span>
+      <button class="btn btn-ghost btn-sm"
+              onclick="openEditSnippet({{ s.id }}, '{{ s.title|replace("'","\'") }}', '{{ s.language }}', '{{ s.is_public }}', '{{ s.description|replace("'","\'") }}')">Edit</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteSnippet({{ s.id }}, this)">Delete</button>
+    </div>
+  </div>
+  {% else %}
+  <div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--text-3);">
+    You haven't added any snippets yet.
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block modals %}
+<!-- ── FULLSCREEN CODE VIEWER ────────────────────────────────────────── -->
+<div id="fullscreenModal"
+     style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,0.72);
+            backdrop-filter:blur(4px);align-items:center;justify-content:center;">
+  <div style="width:min(92vw,1100px);height:min(88vh,820px);background:var(--bg-raised);
+              border:1px solid var(--border);border-radius:12px;
+              display:flex;flex-direction:column;overflow:hidden;
+              box-shadow:0 24px 80px rgba(0,0,0,0.35);">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;gap:12px;padding:14px 20px;
+                border-bottom:1px solid var(--border);flex-shrink:0;
+                background:var(--bg-1);">
+      <!-- Traffic light dots -->
+      <div style="display:flex;gap:6px;flex-shrink:0;">
+        <div style="width:12px;height:12px;border-radius:50%;background:#EF4444;cursor:pointer;"
+             onclick="closeFullscreen()" title="Close"></div>
+        <div style="width:12px;height:12px;border-radius:50%;background:#F59E0B;"></div>
+        <div style="width:12px;height:12px;border-radius:50%;background:#10B981;"></div>
+      </div>
+      <div style="flex:1;min-width:0;">
+        <span id="fsTitle"
+              style="font-weight:700;font-size:0.9rem;color:var(--text);">Snippet</span>
+        <span id="fsLangBadge"
+              style="margin-left:8px;font-size:0.72rem;font-weight:600;
+                     font-family:'JetBrains Mono',monospace;color:var(--text-3);
+                     background:var(--bg-2);border:1px solid var(--border);
+                     border-radius:4px;padding:1px 7px;"></span>
+      </div>
+      <!-- Line count -->
+      <span id="fsLines"
+            style="font-size:0.7rem;font-family:'JetBrains Mono',monospace;
+                   color:var(--text-4);flex-shrink:0;"></span>
+      <!-- Copy button -->
+      <button id="fsCopyBtn" onclick="fsCopy()"
+              style="padding:5px 14px;background:var(--bg-2);border:1px solid var(--border);
+                     border-radius:5px;font-family:'Raleway',sans-serif;font-size:0.78rem;
+                     font-weight:600;color:var(--text-2);cursor:pointer;
+                     transition:all 0.13s;flex-shrink:0;">
+        Copy
+      </button>
+      <!-- Close button -->
+      <button onclick="closeFullscreen()"
+              style="width:28px;height:28px;border-radius:5px;background:transparent;
+                     border:1px solid var(--border);color:var(--text-3);
+                     cursor:pointer;font-size:0.9rem;display:flex;align-items:center;
+                     justify-content:center;flex-shrink:0;transition:all 0.13s;"
+              onmouseover="this.style.background='var(--bg-2)'"
+              onmouseout="this.style.background='transparent'">✕</button>
+    </div>
+
+    <!-- Code body: line numbers + code -->
+    <div style="flex:1;overflow:auto;display:flex;font-family:'JetBrains Mono',monospace;
+                font-size:0.82rem;line-height:1.75;background:var(--bg-1);">
+      <!-- Line numbers column -->
+      <div id="fsLineNums"
+           style="padding:16px 0;min-width:52px;text-align:right;color:var(--text-4);
+                  background:var(--bg-2);border-right:1px solid var(--border);
+                  user-select:none;flex-shrink:0;font-size:0.75rem;line-height:1.75;">
+      </div>
+      <!-- Actual code -->
+      <pre id="fsCode"
+           style="flex:1;margin:0;padding:16px 20px;white-space:pre;
+                  overflow:visible;background:transparent;
+                  color:var(--text-2);line-height:1.75;font-size:0.82rem;"></pre>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── ADD / EDIT SNIPPET MODAL ──────────────────────────────────────── -->
+<div class="modal-overlay" id="addSnippetModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <span class="modal-title" id="snippetModalTitle">Add New Snippet</span>
+      <button class="modal-close" onclick="closeModal('addSnippetModal')">✕</button>
+    </div>
+    <input type="hidden" id="editSnippetId" value="">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+      <div class="form-group">
+        <label>Title</label>
+        <input class="form-input" id="sTitle" placeholder="Snippet title" required>
+      </div>
+      <div class="form-group">
+        <label>Language</label>
+        <select class="form-select" id="sLang" style="width:100%;padding:12px 14px;">
+          {% for lang in ['python','javascript','html','css','sql','bash','java','cpp','rust','go','typescript','php','ruby','swift','kotlin'] %}
+          <option value="{{ lang }}">{{ lang }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:16px;">
+      <label>Code</label>
+      <textarea class="form-textarea" id="sCode"
+                style="min-height:200px;font-family:'JetBrains Mono',monospace;font-size:0.82rem;"
+                placeholder="Paste your code here…"></textarea>
+    </div>
+    <div class="form-group" style="margin-bottom:16px;">
+      <label>Description (optional)</label>
+      <input class="form-input" id="sDesc" placeholder="Brief description…">
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+      <input type="checkbox" id="sPublic" checked style="cursor:pointer;">
+      <label for="sPublic" style="cursor:pointer;font-size:0.88rem;">Make public (visible to all users)</label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addSnippetModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSnippet()">Save Snippet</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_scripts %}
+<style>
+  /* Show snippet actions on card hover */
+  .snippet-card:hover .snippet-actions { opacity: 1 !important; }
+</style>
+<script>
+/* ── Tab switcher ── */
+function switchTab(tab) {
+  document.getElementById('panelPublic').style.display = tab === 'public' ? 'grid' : 'none';
+  document.getElementById('panelMine').style.display   = tab === 'mine'   ? 'grid' : 'none';
+  document.getElementById('tabPublic').classList.toggle('active', tab === 'public');
+  document.getElementById('tabMine').classList.toggle('active', tab === 'mine');
+  document.getElementById('tabPublic').style.borderBottom = tab === 'public' ? '2px solid var(--accent)' : 'none';
+  document.getElementById('tabMine').style.borderBottom   = tab === 'mine'   ? '2px solid var(--accent)' : 'none';
+}
+
+/* ── Generic modals ── */
+function openModal(id)  { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+/* ── Fullscreen viewer ── */
+let _fsCode = '';
+
+function openFullscreen(title, lang, codeElId) {
+  const raw = document.getElementById(codeElId)?.textContent || '';
+  _fsCode = raw;
+
+  const lines = raw.split('\n');
+  // Line numbers
+  const nums = document.getElementById('fsLineNums');
+  nums.innerHTML = lines.map((_, i) =>
+    `<div style="padding:0 14px;">${i + 1}</div>`
+  ).join('');
+
+  // Code content (escape HTML)
+  document.getElementById('fsCode').textContent = raw;
+
+  document.getElementById('fsTitle').textContent = title;
+  document.getElementById('fsLangBadge').textContent = lang;
+  document.getElementById('fsLines').textContent = lines.length + ' lines';
+
+  const modal = document.getElementById('fullscreenModal');
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeFullscreen() {
+  document.getElementById('fullscreenModal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+async function fsCopy() {
+  await navigator.clipboard.writeText(_fsCode);
+  const btn = document.getElementById('fsCopyBtn');
+  btn.textContent = 'Copied!';
+  btn.style.color = 'var(--accent-2)';
+  btn.style.borderColor = 'var(--accent-2-border)';
+  setTimeout(() => {
+    btn.textContent = 'Copy';
+    btn.style.color = '';
+    btn.style.borderColor = '';
+  }, 1800);
+}
+
+// Close on backdrop click
+document.getElementById('fullscreenModal').addEventListener('click', function(e) {
+  if (e.target === this) closeFullscreen();
+});
+// Close on Escape
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeFullscreen();
+});
+
+/* ── Inline copy ── */
+function copyCode(id, btn) {
+  const text = document.getElementById(id)?.textContent || '';
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = orig, 1500);
+  });
+}
+
+/* ── Edit snippet ── */
+function openEditSnippet(id, title, lang, isPublic, desc) {
+  document.getElementById('snippetModalTitle').textContent = 'Edit Snippet';
+  document.getElementById('editSnippetId').value = id;
+  document.getElementById('sTitle').value   = title;
+  document.getElementById('sLang').value    = lang;
+  document.getElementById('sPublic').checked = isPublic === '1';
+  document.getElementById('sDesc').value    = desc;
+  const codeEl = document.getElementById('mine-' + id);
+  if (codeEl) document.getElementById('sCode').value = codeEl.textContent;
+  openModal('addSnippetModal');
+}
+
+/* ── Save snippet ── */
+async function saveSnippet() {
+  const id    = document.getElementById('editSnippetId').value || null;
+  const title = document.getElementById('sTitle').value.trim();
+  const lang  = document.getElementById('sLang').value;
+  const code  = document.getElementById('sCode').value;
+  const desc  = document.getElementById('sDesc').value.trim();
+  const pub   = document.getElementById('sPublic').checked;
+  if (!title || !code) { alert('Title and code are required.'); return; }
+  const payload = { title, language: lang, code, description: desc, is_public: pub };
+  if (id) payload.id = parseInt(id);
+  const res = await fetch('/api/vault/save', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if ((await res.json()).ok) location.reload();
+}
+
+/* ── Delete snippet ── */
+async function deleteSnippet(id, btn) {
+  if (!confirm('Delete this snippet?')) return;
+  const res = await fetch('/api/vault/' + id, { method: 'DELETE' });
+  if ((await res.json()).ok) btn.closest('.snippet-card').remove();
+}
+</script>
+{% endblock %}

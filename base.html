@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}LaunchGate{% endblock %} — LaunchGate</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+
+  <!-- Main CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+  {% block head %}{% endblock %}
+
+  <style>
+    /* Flash auto-dismiss */
+    .flash { cursor: pointer; }
+  </style>
+</head>
+<body>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="flash-container" id="flashContainer">
+  {% for category, message in messages %}
+  <div class="flash flash-{{ category }}" onclick="this.remove()">
+    <span>{% if category == 'success' %}✓{% elif category == 'error' or category == 'danger' %}✕{% else %}ℹ{% endif %}</span>
+    <span>{{ message }}</span>
+    <button class="flash-close" onclick="this.parentElement.remove()">✕</button>
+  </div>
+  {% endfor %}
+</div>
+<script>
+  setTimeout(() => {
+    document.querySelectorAll('.flash').forEach(f => {
+      f.style.transition = 'opacity 0.4s ease';
+      f.style.opacity = '0';
+      setTimeout(() => f.remove(), 400);
+    });
+  }, 4000);
+</script>
+{% endif %}
+{% endwith %}
+
+{% block body %}{% endblock %}
+
+</body>
+</html>

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Sign In{% endblock %}
+
+{% block body %}
+<div class="auth-page">
+  <div class="auth-card">
+
+    <div class="auth-logo">
+      <div class="auth-logo-icon">LG</div>
+      <div class="auth-title">LaunchGate</div>
+      <div class="auth-subtitle">Sign in to your unified workspace</div>
+    </div>
+
+    <form class="auth-form" method="POST" action="{{ url_for('login') }}">
+      <div class="form-group">
+        <label>Username</label>
+        <input class="form-input" type="text" name="username"
+               placeholder="Enter your username" required autocomplete="username">
+      </div>
+
+      <div class="form-group">
+        <label>Password</label>
+        <input class="form-input" type="password" name="password"
+               placeholder="Enter your password" required autocomplete="current-password">
+      </div>
+
+      <div class="auth-divider">Admin Access (Optional)</div>
+
+      <div class="passkey-field">
+        <label>⚿ Administrative Passkey</label>
+        <input class="form-input" type="password" name="passkey"
+               placeholder="e.g. NEURO-2026-X"
+               autocomplete="off"
+               style="background:transparent;border-color:rgba(245,158,11,0.3);">
+        <span style="font-size:0.72rem;color:var(--text-3);">Leave blank for standard access. Enter passkey to activate admin privileges.</span>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-lg" style="width:100%;justify-content:center;">
+        Launch Workspace →
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      Don't have an account? <a href="{{ url_for('register') }}">Create one free</a>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

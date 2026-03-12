@@ -1,0 +1,138 @@
+{% extends "layout.html" %}
+{% block title %}{{ quiz.title }}{% endblock %}
+{% block breadcrumb %}/ Quiz Portal / Attempt{% endblock %}
+
+{% block head %}
+<style>
+.quiz-q {
+  background: var(--bg-raised, #1a1f2e);
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 12px);
+  padding: 24px;
+  margin-bottom: 16px;
+}
+.q-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 10px;
+}
+.q-text { font-size: 1rem; font-weight: 600; line-height: 1.55; margin-bottom: 18px; }
+.mcq-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--bg, #0d0f14);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  font-size: 0.9rem;
+  margin-bottom: 8px;
+}
+.mcq-label:hover { border-color: var(--accent); }
+.mcq-label:has(input:checked) {
+  border-color: var(--accent);
+  background: rgba(79,142,247,0.08);
+  color: var(--accent);
+}
+.mcq-label input { accent-color: var(--accent); }
+.option-key {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  color: var(--accent);
+  width: 20px;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+.quiz-progress {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+.progress-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--border);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.progress-dot.answered { background: var(--accent); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:760px;">
+
+  <div class="page-header">
+    <div>
+      <div class="page-title">{{ quiz.title }}</div>
+      <div class="page-subtitle">{{ quiz_data|length }} question{{ 's' if quiz_data|length != 1 }} · Read carefully before submitting</div>
+    </div>
+    <a href="{{ url_for('quiz_home') }}" class="btn btn-ghost">← Back</a>
+  </div>
+
+  <!-- Progress dots -->
+  <div class="quiz-progress" id="progressDots">
+    {% for _ in quiz_data %}
+    <div class="progress-dot" id="dot-{{ loop.index }}" title="Q{{ loop.index }}"></div>
+    {% endfor %}
+  </div>
+
+  <form action="{{ url_for('quiz_submit', quiz_id=quiz.id) }}" method="POST" id="quizForm">
+    {% for item in quiz_data %}
+    <div class="quiz-q" id="q{{ loop.index }}">
+      <div class="q-num">
+        Question {{ loop.index }} of {{ quiz_data|length }}
+        <span style="margin-left:12px;color:var(--text-3);">
+          {{ item.question.marks }} mark{{ 's' if item.question.marks != 1 }}
+        </span>
+      </div>
+      <div class="q-text">{{ item.question.question_text }}</div>
+
+      {% if item.question.question_type == 'MCQ' %}
+        {% for opt in item.options %}
+        <label class="mcq-label">
+          <input type="radio" name="ans_{{ item.question.id }}"
+                 value="{{ loop.index0|index_to_char }}" required
+                 onchange="markAnswered({{ loop.index }})">
+          <span class="option-key">{{ loop.index0|index_to_char }})</span>
+          {{ opt.option_text }}
+        </label>
+        {% endfor %}
+      {% else %}
+        <textarea name="ans_{{ item.question.id }}"
+                  class="form-textarea"
+                  style="font-family:'JetBrains Mono',monospace;font-size:0.88rem;min-height:120px;"
+                  placeholder="Write your answer here…"
+                  required
+                  oninput="markAnswered({{ loop.index }})"></textarea>
+      {% endif %}
+    </div>
+    {% endfor %}
+
+    <div class="card" style="display:flex;align-items:center;justify-content:space-between;padding:16px 24px;">
+      <div style="font-size:0.85rem;color:var(--text-2);">
+        Review all answers before submitting.
+      </div>
+      <button type="submit" class="btn btn-primary" style="padding:12px 32px;font-size:1rem;"
+              onclick="return confirm('Submit this quiz? You cannot change your answers after submission.')">
+        Submit Test ✓
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+const totalQ = {{ quiz_data|length }};
+function markAnswered(idx) {
+  const dot = document.getElementById(`dot-${idx}`);
+  if (dot) dot.classList.add('answered');
+}
+</script>
+{% endblock %}

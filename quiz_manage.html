@@ -1,0 +1,99 @@
+{% extends "layout.html" %}
+{% block title %}Manage Quizzes{% endblock %}
+{% block breadcrumb %}/ Quiz Portal / Manage{% endblock %}
+
+{% block content %}
+<div class="page-header flex items-center justify-between">
+  <div>
+    <div class="page-title">Manage Quizzes</div>
+    <div class="page-subtitle">Create, toggle, and review all published assessments.</div>
+  </div>
+  <a href="{{ url_for('quiz_create') }}" class="btn btn-primary">+ New Quiz</a>
+</div>
+
+{% if quizzes %}
+<div class="card" style="padding:0;overflow:hidden;">
+  <div class="data-table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Creator</th>
+          <th>Questions</th>
+          <th>Submissions</th>
+          <th>Status</th>
+          <th>Created</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for q in quizzes %}
+        <tr id="quiz-row-{{ q.id }}">
+          <td style="font-weight:600;">{{ q.title }}</td>
+          <td style="color:var(--text-2);">{{ q.creator_name }}</td>
+          <td>
+            <span class="badge badge-blue">{{ q.q_count }} Qs</span>
+          </td>
+          <td>
+            {% if q.resp_count > 0 %}
+            <a href="{{ url_for('quiz_responses', quiz_id=q.id) }}" style="color:var(--accent);font-weight:600;">
+              {{ q.resp_count }} →
+            </a>
+            {% else %}
+            <span style="color:var(--text-3);">0</span>
+            {% endif %}
+          </td>
+          <td>
+            <span id="status-{{ q.id }}" class="badge {% if q.is_active %}badge-green{% else %}badge-red{% endif %}">
+              {% if q.is_active %}Active{% else %}Inactive{% endif %}
+            </span>
+          </td>
+          <td style="color:var(--text-3);font-size:0.8rem;">{{ q.created_at[:10] }}</td>
+          <td>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <button class="btn btn-ghost btn-sm"
+                      onclick="toggleQuiz({{ q.id }}, {{ q.is_active }})">
+                {% if q.is_active %}Pause{% else %}Activate{% endif %}
+              </button>
+              {% if q.resp_count > 0 %}
+              <a href="{{ url_for('quiz_responses', quiz_id=q.id) }}" class="btn btn-ghost btn-sm">Results</a>
+              {% endif %}
+              <form action="{{ url_for('quiz_delete', quiz_id=q.id) }}" method="POST"
+                    onsubmit="return confirm('Delete {{ q.title }} and all responses? This cannot be undone.');">
+                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:60px;">
+  <div style="font-size:3rem;margin-bottom:16px;"></div>
+  <div style="font-size:1rem;font-weight:600;margin-bottom:8px;">No quizzes yet</div>
+  <a href="{{ url_for('quiz_create') }}" class="btn btn-primary" style="margin-top:12px;">Create your first quiz →</a>
+</div>
+{% endif %}
+
+<script>
+async function toggleQuiz(id, currentlyActive) {
+  const res  = await fetch(`/quizzes/${id}/toggle`, { method: 'POST' });
+  const data = await res.json();
+  if (!data.ok) return;
+  const badge = document.getElementById(`status-${id}`);
+  const btn   = badge.closest('tr').querySelector('button');
+  if (data.is_active) {
+    badge.textContent = 'Active';
+    badge.className   = 'badge badge-green';
+    btn.textContent   = 'Pause';
+  } else {
+    badge.textContent = 'Inactive';
+    badge.className   = 'badge badge-red';
+    btn.textContent   = 'Activate';
+  }
+}
+</script>
+{% endblock %}

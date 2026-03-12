@@ -1,3 +1,4 @@
+
 import sqlite3
 
 def setup_database():
@@ -32,4 +33,5 @@ def setup_database():
     print("Database initialized successfully! You can now run app.py.")
 
 if __name__ == '__main__':
+
     setup_database()

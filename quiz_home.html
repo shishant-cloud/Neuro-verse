@@ -1,0 +1,124 @@
+{% extends "layout.html" %}
+{% block title %}Quiz Portal{% endblock %}
+{% block breadcrumb %}/ Quiz Portal{% endblock %}
+
+{% block content %}
+<div class="page-header flex items-center justify-between">
+  <div>
+    <div class="page-title">Quiz Portal</div>
+    <div class="page-subtitle">Test your knowledge — attempt quizzes and track your results.</div>
+  </div>
+  {% if session.get('is_admin') %}
+  <div style="display:flex;gap:8px;">
+    <a href="{{ url_for('quiz_manage') }}" class="btn btn-ghost">Manage →</a>
+    <a href="{{ url_for('quiz_create') }}" class="btn btn-primary">+ New Quiz</a>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Stats Row -->
+<div class="stats-row" style="margin-bottom:28px;">
+  <div class="stat-card blue">
+    <div class="stat-icon"></div>
+    <div class="stat-value">{{ quizzes|length }}</div>
+    <div class="stat-label">Available Quizzes</div>
+  </div>
+  <div class="stat-card green">
+    <div class="stat-icon"></div>
+    <div class="stat-value">{{ attempted_ids|length }}</div>
+    <div class="stat-label">Attempted</div>
+  </div>
+  <div class="stat-card amber">
+    <div class="stat-icon"></div>
+    <div class="stat-value">{{ quizzes|length - attempted_ids|length }}</div>
+    <div class="stat-label">Remaining</div>
+  </div>
+  {% if my_responses %}
+  <div class="stat-card purple">
+    <div class="stat-icon">⭐</div>
+    <div class="stat-value">
+      {% set best = my_responses|sort(attribute='score', reverse=True)|first %}
+      {% if best.total_marks > 0 %}{{ (best.score / best.total_marks * 100)|int }}%{% else %}—{% endif %}
+    </div>
+    <div class="stat-label">Best Score</div>
+  </div>
+  {% endif %}
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 340px;gap:24px;align-items:start;">
+
+  <!-- Available Quizzes -->
+  <div>
+    <h2 style="font-size:1rem;font-weight:700;margin-bottom:16px;">Available Assessments</h2>
+
+    {% if quizzes %}
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      {% for quiz in quizzes %}
+      <div class="card" style="display:flex;align-items:center;gap:20px;padding:20px 24px;">
+        <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#4f8ef7,#7c5cfc);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;">📋</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;font-size:1rem;margin-bottom:4px;">{{ quiz.title }}</div>
+          <div style="display:flex;align-items:center;gap:10px;font-size:0.78rem;color:var(--text-2);">
+            <span>by {{ quiz.creator_name }}</span>
+            <span>·</span>
+            <span>{{ quiz.q_count }} question{{ 's' if quiz.q_count != 1 }}</span>
+            <span>·</span>
+            <span>{{ quiz.created_at[:10] }}</span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+          {% if quiz.id in attempted_ids %}
+          <span class="badge badge-green">Attempted</span>
+          <a href="{{ url_for('quiz_attempt', quiz_id=quiz.id) }}" class="btn btn-ghost btn-sm">Retake</a>
+          {% else %}
+          <span class="badge badge-blue">Open</span>
+          <a href="{{ url_for('quiz_attempt', quiz_id=quiz.id) }}" class="btn btn-primary btn-sm">Start →</a>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="card" style="text-align:center;padding:60px 20px;color:var(--text-3);">
+      <div style="font-size:3rem;margin-bottom:16px;"></div>
+      <div style="font-size:1rem;font-weight:600;margin-bottom:8px;">No quizzes yet</div>
+      <div style="font-size:0.85rem;">Check back soon — your instructor will publish quizzes here.</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Score History Sidebar -->
+  <div style="display:flex;flex-direction:column;gap:16px;">
+    <div class="card">
+      <div style="font-size:0.75rem;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:16px;">My Score History</div>
+
+      {% if my_responses %}
+      {% for res in my_responses %}
+      <div style="padding:12px 0;border-bottom:1px solid var(--border);{% if loop.last %}border-bottom:none;{% endif %}">
+        <div style="font-size:0.85rem;font-weight:600;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ res.quiz_title }}</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          {% if res.total_marks > 0 %}
+            {% set pct = (res.score / res.total_marks * 100)|int %}
+            <div style="flex:1;height:6px;background:var(--bg-raised);border-radius:3px;overflow:hidden;">
+              <div style="height:100%;width:{{ pct }}%;background:{% if pct>=70 %}#34d399{% elif pct>=40 %}#fbbf24{% else %}#f87171{% endif %};border-radius:3px;transition:width 0.6s;"></div>
+            </div>
+            <span style="font-size:0.78rem;font-weight:700;color:{% if pct>=70 %}#34d399{% elif pct>=40 %}#fbbf24{% else %}#f87171{% endif %};">{{ pct }}%</span>
+            <span style="font-size:0.72rem;color:var(--text-3);">{{ res.score }}/{{ res.total_marks }}</span>
+          {% else %}
+          <span style="font-size:0.78rem;color:var(--text-3);">—</span>
+          {% endif %}
+        </div>
+        <div style="font-size:0.7rem;color:var(--text-3);margin-top:4px;">{{ res.submitted_at[:16] if res.submitted_at else '' }}</div>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div style="text-align:center;padding:24px;color:var(--text-3);font-size:0.82rem;">
+        <div style="font-size:2rem;margin-bottom:8px;"></div>
+        No attempts yet. Take your first quiz!
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}
