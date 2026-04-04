@@ -1,14 +1,15 @@
+
 {% extends "layout.html" %}
 {% block title %}Code Editor{% endblock %}
 {% block breadcrumb %}/ Code Editor{% endblock %}
-
+ 
 {% block content %}
-
+ 
 <!-- ── Inline styles for the editor page ────────────────────────────── -->
 <style>
   /* Hide default main-content padding on this page so editor fills space */
   .main-content { padding: 0 !important; }
-
+ 
   /* ── Top bar ── */
   .ce-topbar {
     display: flex;
@@ -36,7 +37,7 @@
     font-size: 0.75rem; color: var(--bg); font-weight: 800;
     flex-shrink: 0;
   }
-
+ 
   /* Language picker */
   .ce-lang-grid {
     display: flex;
@@ -62,7 +63,7 @@
     color: var(--bg);
     border-color: var(--text);
   }
-
+ 
   /* Run button */
   .ce-run-btn {
     margin-left: auto;
@@ -93,7 +94,7 @@
     flex-shrink: 0;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
-
+ 
   /* ── Main editor layout ── */
   .ce-layout {
     display: grid;
@@ -102,7 +103,7 @@
     height: calc(100vh - var(--navbar-h) - 52px);  /* subtract topbar */
     overflow: hidden;
   }
-
+ 
   /* ── Left: editor pane ── */
   .ce-editor-pane {
     display: flex;
@@ -128,7 +129,7 @@
     background: var(--accent-2); flex-shrink: 0;
   }
   .ce-file-dot.modified { background: var(--accent-3); }
-
+ 
   /* Textarea code editor */
   #codeInput {
     flex: 1;
@@ -150,7 +151,7 @@
   #codeInput::-webkit-scrollbar { width: 6px; }
   #codeInput::-webkit-scrollbar-track { background: #F3F4F6; }
   #codeInput::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 99px; }
-
+ 
   /* Line numbers overlay (purely visual via a wrapper) */
   .ce-editor-wrapper {
     flex: 1;
@@ -173,7 +174,7 @@
     flex-shrink: 0;
     border-right: 1px solid #E5E7EB;
   }
-
+ 
   /* ── STDIN input ── */
   .ce-stdin-wrap {
     flex-shrink: 0;
@@ -203,7 +204,7 @@
     height: 72px;
   }
   #stdinInput::placeholder { color: #9CA3AF; }
-
+ 
   /* ── Right: output pane ── */
   .ce-output-pane {
     display: flex;
@@ -233,7 +234,7 @@
   .ce-status-badge.ok     { background: rgba(16,185,129,0.1); color: #059669; }
   .ce-status-badge.error  { background: rgba(239,68,68,0.1); color: #DC2626; }
   .ce-status-badge.run    { background: rgba(0,112,243,0.1); color: #0070F3; }
-
+ 
   #outputBox {
     flex: 1;
     overflow-y: auto;
@@ -259,7 +260,7 @@
     font-size: 0.68rem; color: #9CA3AF;
     border-top: 1px solid #E5E7EB; padding-top: 8px;
   }
-
+ 
   /* ── Info sidebar at bottom of output ── */
   .ce-info-bar {
     flex-shrink: 0;
@@ -273,7 +274,7 @@
     color: #9CA3AF; display: flex; align-items: center; gap: 5px;
   }
   .ce-info-item span { color: #6B7280; }
-
+ 
   /* Snippet actions row */
   .ce-actions {
     display: flex; gap: 8px;
@@ -301,16 +302,16 @@
   }
   .ce-action-btn.save-vault:hover { background: rgba(0,112,243,0.12); }
 </style>
-
+ 
 <!-- ── TOP BAR ─────────────────────────────────────────────────────── -->
 <div class="ce-topbar">
   <div class="ce-title">
     <div class="ce-title-icon">{ }</div>
     Code Editor
   </div>
-
+ 
   <div style="width:1px;height:22px;background:var(--border);flex-shrink:0;"></div>
-
+ 
   <!-- Language selector -->
   <div class="ce-lang-grid" id="langGrid">
     <button class="ce-lang-btn active" data-lang="python"     data-version="3.10.0" data-ext="py"   onclick="setLang(this)">🐍 Python</button>
@@ -324,7 +325,7 @@
     <button class="ce-lang-btn"        data-lang="go"         data-version="1.20.3" data-ext="go"   onclick="setLang(this)">🐹 Go</button>
     <button class="ce-lang-btn"        data-lang="bash"       data-version="5.2.0"  data-ext="sh"   onclick="setLang(this)">$ Bash</button>
   </div>
-
+ 
   <!-- Run -->
   <button class="ce-run-btn" id="runBtn" onclick="runCode()">
     <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
@@ -333,11 +334,11 @@
     Run
   </button>
 </div>
-
-
+ 
+ 
 <!-- ── MAIN LAYOUT ──────────────────────────────────────────────────── -->
 <div class="ce-layout">
-
+ 
   <!-- LEFT: Editor + stdin -->
   <div class="ce-editor-pane">
     <div class="ce-editor-header">
@@ -351,7 +352,7 @@
         <button class="ce-action-btn" onclick="downloadCode()" title="Download">↓ Download</button>
       </div>
     </div>
-
+ 
     <div class="ce-editor-wrapper">
       <!-- Line numbers -->
       <div id="lineNums">1</div>
@@ -363,7 +364,7 @@
                 onkeydown="handleTabKey(event)"
                 onscroll="syncScroll()"></textarea>
     </div>
-
+ 
     <!-- STDIN -->
     <div class="ce-stdin-wrap">
       <div class="ce-stdin-header">
@@ -373,41 +374,41 @@
       <textarea id="stdinInput" placeholder="Enter program input here (if needed)…"></textarea>
     </div>
   </div>
-
-
+ 
+ 
   <!-- RIGHT: Output -->
   <div class="ce-output-pane">
     <div class="ce-output-header">
       <span class="ce-output-title">Output</span>
       <span class="ce-status-badge" id="statusBadge">Ready</span>
     </div>
-
+ 
     <div id="outputBox">
       <div class="out-placeholder">Hit <kbd style="background:#E5E7EB;color:#374151;padding:1px 6px;border-radius:3px;font-style:normal;">Run</kbd> to execute your code…</div>
     </div>
-
+ 
     <div class="ce-info-bar">
       <div class="ce-info-item">Lang: <span id="infoLang">Python 3.10</span></div>
       <div class="ce-info-item">API: <span>Piston (piston.heliohost.dev)</span></div>
       <div class="ce-info-item" id="infoTime" style="display:none;">Time: <span id="infoTimeVal">—</span></div>
     </div>
-
+ 
     <div class="ce-actions">
       <button class="ce-action-btn" onclick="clearOutput()">✕ Clear output</button>
       <button class="ce-action-btn save-vault" onclick="openShareModal()">⬡ Share to Vault</button>
     </div>
   </div>
-
+ 
 </div>
-
-
+ 
+ 
 <!-- ── SCRIPTS ─────────────────────────────────────────────────────── -->
 <script>
 /* ───────────────────────────────────────────────────────────────────────
    STATE
 ─────────────────────────────────────────────────────────────────────── */
-const PISTON_API = 'https://emkc.org/api/v2/piston/execute';
-
+const PISTON_API = '/api/run-code';  // Flask proxy — avoids CORS & 401 errors
+ 
 const STARTERS = {
   python: `# Python 3\nprint("Hello, NeuroVerse!")\n\n# Input example:\n# name = input("Enter your name: ")\n# print(f"Hello, {name}!")`,
   c: `#include <stdio.h>\n\nint main() {\n    printf("Hello, NeuroVerse!\\n");\n    return 0;\n}`,
@@ -420,7 +421,7 @@ const STARTERS = {
   go: `package main\n\nimport "fmt"\n\nfunc main() {\n    fmt.Println("Hello, NeuroVerse!")\n}`,
   bash: `#!/bin/bash\necho "Hello, NeuroVerse!"\necho "Current date: $(date)"\nfor i in 1 2 3; do\n  echo "Count: $i"\ndone`,
 };
-
+ 
 const VERSIONS = {
   python: '3.10.0', c: '10.2.0', 'c++': '10.2.0', java: '15.0.2',
   javascript: '18.15.0', html: '*', typescript: '5.0.3',
@@ -430,16 +431,16 @@ const EXTS = {
   python:'py', c:'c', 'c++':'cpp', java:'java', javascript:'js',
   html:'html', typescript:'ts', rust:'rs', go:'go', bash:'sh',
 };
-
+ 
 let currentLang = 'python';
 let isRunning   = false;
-
+ 
 /* ───────────────────────────────────────────────────────────────────────
    INIT
 ─────────────────────────────────────────────────────────────────────── */
 document.getElementById('codeInput').value = STARTERS.python;
 updateLineNumbers();
-
+ 
 /* ───────────────────────────────────────────────────────────────────────
    LANGUAGE SWITCH
 ─────────────────────────────────────────────────────────────────────── */
@@ -447,17 +448,17 @@ function setLang(btn) {
   document.querySelectorAll('.ce-lang-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   currentLang = btn.dataset.lang;
-
+ 
   // Set starter code
   document.getElementById('codeInput').value = STARTERS[currentLang] || '';
   document.getElementById('fileLabel').textContent = 'main.' + EXTS[currentLang];
   document.getElementById('infoLang').textContent = btn.textContent.trim().replace(/^.+?\s/,'') + ' ' + (VERSIONS[currentLang] || '');
   document.getElementById('fileDot').classList.remove('modified');
-
+ 
   updateLineNumbers();
   clearOutput();
 }
-
+ 
 /* ───────────────────────────────────────────────────────────────────────
    LINE NUMBERS
 ─────────────────────────────────────────────────────────────────────── */
@@ -469,17 +470,17 @@ function updateLineNumbers() {
   for (let i = 1; i <= count; i++) html += i + '\n';
   nums.textContent = html;
 }
-
+ 
 function syncScroll() {
   const ta = document.getElementById('codeInput');
   document.getElementById('lineNums').scrollTop = ta.scrollTop;
 }
-
+ 
 function onCodeInput() {
   updateLineNumbers();
   document.getElementById('fileDot').classList.add('modified');
 }
-
+ 
 /* ───────────────────────────────────────────────────────────────────────
    TAB KEY — insert 4 spaces instead of focus-trap
 ─────────────────────────────────────────────────────────────────────── */
@@ -493,7 +494,7 @@ function handleTabKey(e) {
   ta.selectionStart = ta.selectionEnd = start + 4;
   updateLineNumbers();
 }
-
+ 
 /* ───────────────────────────────────────────────────────────────────────
    RUN CODE
 ─────────────────────────────────────────────────────────────────────── */
@@ -501,53 +502,56 @@ async function runCode() {
   if (isRunning) return;
   const code  = document.getElementById('codeInput').value.trim();
   if (!code) { showOutput('<span class="out-system">Nothing to run.</span>'); return; }
-
+ 
   // HTML — render in iframe instead of executing
   if (currentLang === 'html') {
     renderHTML(code);
     return;
   }
-
+ 
   isRunning = true;
   setRunBtn(true);
   setBadge('run', '● Running…');
   showOutput('<span class="out-system">⟳ Sending to Piston execution engine…</span>');
-
+ 
   const stdin = document.getElementById('stdinInput').value;
   const t0    = Date.now();
-
+ 
   // Java: Piston requires filename = class name
   let filename = 'main.' + EXTS[currentLang];
   if (currentLang === 'java') {
     const match = code.match(/public\s+class\s+(\w+)/);
     if (match) filename = match[1] + '.java';
   }
-
+ 
+  // Flask proxy (/api/run-code) calls Piston server-side — fixes CORS/401 errors.
   const payload = {
     language: currentLang,
     version:  VERSIONS[currentLang],
-    files: [{ name: filename, content: code }],
-    stdin: stdin,
-    args:  [],
-    run_timeout:     10000,
-    compile_timeout: 15000,
+    code:     code,
+    stdin:    stdin,
+    args:     [],
+    filename: filename,
   };
-
+ 
   try {
     const res  = await fetch(PISTON_API, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify(payload),
     });
-
+ 
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-
-    const data  = await res.json();
+ 
+    const wrapper = await res.json();
+    if (!wrapper.ok) throw new Error(wrapper.error || 'Execution failed on server.');
+ 
+    const data  = wrapper.result;
     const ms    = Date.now() - t0;
     const run   = data.run   || {};
     const comp  = data.compile || {};
     let html    = '';
-
+ 
     // Compile errors (C, C++, Java, Rust, Go, TypeScript)
     if (comp.stderr && comp.stderr.trim()) {
       html += `<span class="out-error">── Compilation Error ──\n${esc(comp.stderr.trim())}\n</span>`;
@@ -555,7 +559,7 @@ async function runCode() {
     if (comp.stdout && comp.stdout.trim()) {
       html += `<span class="out-system">── Compiler output ──\n${esc(comp.stdout.trim())}\n</span>`;
     }
-
+ 
     // Runtime output
     if (run.stdout && run.stdout.trim()) {
       html += `<span class="out-success">${esc(run.stdout)}</span>`;
@@ -566,17 +570,17 @@ async function runCode() {
     if (!html) {
       html = '<span class="out-system">(no output)</span>';
     }
-
+ 
     // Exit code indicator
     const exitOk = run.code === 0;
     html += `<span class="out-time">exit code ${run.code ?? '?'} · ${ms}ms · ${currentLang}</span>`;
-
+ 
     showOutput(html);
     setBadge(exitOk ? 'ok' : 'error', exitOk ? '✓ Success' : '✕ Error');
-
+ 
     document.getElementById('infoTime').style.display = '';
     document.getElementById('infoTimeVal').textContent = ms + 'ms';
-
+ 
   } catch(err) {
     showOutput(
       `<span class="out-error">── Network / API Error ──\n${esc(err.message)}\n\n` +
@@ -589,7 +593,7 @@ async function runCode() {
     setRunBtn(false);
   }
 }
-
+ 
 /* ───────────────────────────────────────────────────────────────────────
    HTML PREVIEW — render inline in output panel
 ─────────────────────────────────────────────────────────────────────── */
@@ -597,38 +601,38 @@ function renderHTML(code) {
   const box = document.getElementById('outputBox');
   box.innerHTML = '';
   setBadge('ok', '👁 Preview');
-
+ 
   const iframe = document.createElement('iframe');
   iframe.style.cssText = 'width:100%;height:100%;border:none;background:#fff;';
   iframe.sandbox = 'allow-scripts allow-same-origin';
   box.appendChild(iframe);
-
+ 
   const doc = iframe.contentDocument || iframe.contentWindow.document;
   doc.open();
   doc.write(code);
   doc.close();
 }
-
+ 
 /* ───────────────────────────────────────────────────────────────────────
    HELPERS
 ─────────────────────────────────────────────────────────────────────── */
 function showOutput(html) {
   document.getElementById('outputBox').innerHTML = html;
 }
-
+ 
 function clearOutput() {
   document.getElementById('outputBox').innerHTML =
     '<div class="out-placeholder">Hit <kbd style="background:#E5E7EB;color:#374151;padding:1px 6px;border-radius:3px;font-style:normal;">Run</kbd> to execute your code…</div>';
   setBadge('', 'Ready');
   document.getElementById('infoTime').style.display = 'none';
 }
-
+ 
 function setBadge(cls, text) {
   const b = document.getElementById('statusBadge');
   b.className = 'ce-status-badge ' + cls;
   b.textContent = text;
 }
-
+ 
 function setRunBtn(loading) {
   const btn = document.getElementById('runBtn');
   if (loading) {
@@ -639,20 +643,20 @@ function setRunBtn(loading) {
     btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><polygon points="2,1 11,6 2,11"/></svg> Run';
   }
 }
-
+ 
 function esc(s) {
   return String(s || '')
     .replace(/&/g,'&amp;').replace(/</g,'&lt;')
     .replace(/>/g,'&gt;');
 }
-
+ 
 function clearEditor() {
   if (confirm('Clear the editor?')) {
     document.getElementById('codeInput').value = '';
     updateLineNumbers();
   }
 }
-
+ 
 function copyCode() {
   navigator.clipboard.writeText(document.getElementById('codeInput').value).then(() => {
     const btn = event.target;
@@ -660,7 +664,7 @@ function copyCode() {
     setTimeout(() => btn.textContent = '⎘ Copy', 1600);
   });
 }
-
+ 
 function downloadCode() {
   const code = document.getElementById('codeInput').value;
   const ext  = EXTS[currentLang];
@@ -672,7 +676,7 @@ function downloadCode() {
   a.click();
   URL.revokeObjectURL(a.href);
 }
-
+ 
 /* ── Share Modal ── */
 function openShareModal() {
   const code = document.getElementById('codeInput').value.trim();
@@ -687,23 +691,23 @@ function openShareModal() {
   document.getElementById('sm-desc').value = '';
   document.getElementById('sm-public').checked = true;
   updateVisibilityLabel(true);
-
+ 
   // Code preview (first 8 lines)
   const preview = code.split('\n').slice(0, 8).join('\n') + (code.split('\n').length > 8 ? '\n…' : '');
   document.getElementById('sm-preview').textContent = preview;
-
+ 
   // Reset state
   setShareState('idle');
   document.getElementById('shareModal').style.display = 'flex';
   document.body.style.overflow = 'hidden';
   setTimeout(() => document.getElementById('sm-title').select(), 50);
 }
-
+ 
 function closeShareModal() {
   document.getElementById('shareModal').style.display = 'none';
   document.body.style.overflow = '';
 }
-
+ 
 function updateVisibilityLabel(pub) {
   const lbl = document.getElementById('sm-vis-label');
   const desc = document.getElementById('sm-vis-desc');
@@ -717,7 +721,7 @@ function updateVisibilityLabel(pub) {
     lbl.style.color  = '#f9e2af';
   }
 }
-
+ 
 function setShareState(state) {
   const shareBtn = document.getElementById('sm-share-btn');
   const status   = document.getElementById('sm-status');
@@ -745,22 +749,22 @@ function setShareState(state) {
     status.innerHTML = '<span style="color:#DC2626;font-size:0.8rem;">Failed to save. Please try again.</span>';
   }
 }
-
+ 
 async function submitShare() {
   const title = document.getElementById('sm-title').value.trim();
   const desc  = document.getElementById('sm-desc').value.trim();
   const pub   = document.getElementById('sm-public').checked;
   const code  = document.getElementById('codeInput').value.trim();
-
+ 
   if (!title) {
     document.getElementById('sm-title').focus();
     document.getElementById('sm-title').style.borderColor = '#EF4444';
     setTimeout(() => document.getElementById('sm-title').style.borderColor = '', 1500);
     return;
   }
-
+ 
   setShareState('loading');
-
+ 
   try {
     const res  = await fetch('/api/vault/save', {
       method:  'POST',
@@ -783,13 +787,13 @@ async function submitShare() {
     setShareState('error');
   }
 }
-
+ 
 function flashOutput(msg, type) {
   const box = document.getElementById('outputBox');
   const cls = type === 'error' ? 'out-error' : 'out-system';
   box.innerHTML = `<span class="${cls}">${msg}</span>`;
 }
-
+ 
 // Ctrl+Enter = Run
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -798,23 +802,23 @@ document.addEventListener('keydown', e => {
   }
   if (e.key === 'Escape') closeShareModal();
 });
-
+ 
 document.getElementById('shareModal').addEventListener('click', function(e) {
   if (e.target === this) closeShareModal();
 });
 </script>
-
+ 
 <!-- ── SHARE TO VAULT MODAL ──────────────────────────────────────────── -->
 {% block modals %}{% endblock %}
 <div id="shareModal"
      style="display:none;position:fixed;inset:0;z-index:3000;
             background:rgba(0,0,0,0.65);backdrop-filter:blur(6px);
             align-items:center;justify-content:center;">
-
+ 
   <div style="width:min(94vw,560px);background:#FFFFFF;border:1px solid #E5E7EB;
               border-radius:14px;overflow:hidden;
               box-shadow:0 32px 80px rgba(0,0,0,0.5);">
-
+ 
     <!-- Header -->
     <div style="display:flex;align-items:center;justify-content:space-between;
                 padding:16px 20px;border-bottom:1px solid #E5E7EB;background:#F9FAFB;">
@@ -835,10 +839,10 @@ document.getElementById('shareModal').addEventListener('click', function(e) {
               onmouseover="this.style.background='#F3F4F6';this.style.color='#111827'"
               onmouseout="this.style.background='transparent';this.style.color='#6B7280'">✕</button>
     </div>
-
+ 
     <!-- Body -->
     <div style="padding:20px;">
-
+ 
       <!-- Code preview strip -->
       <div style="background:#F8FAFC;border:1px solid #E5E7EB;border-radius:8px;
                   overflow:hidden;margin-bottom:18px;">
@@ -861,7 +865,7 @@ document.getElementById('shareModal').addEventListener('click', function(e) {
                     font-size:0.75rem;line-height:1.7;color:#374151;
                     white-space:pre;overflow:hidden;max-height:130px;"></pre>
       </div>
-
+ 
       <!-- Title -->
       <div style="margin-bottom:14px;">
         <label style="display:block;font-size:0.68rem;font-weight:700;text-transform:uppercase;
@@ -872,7 +876,7 @@ document.getElementById('shareModal').addEventListener('click', function(e) {
                       padding:9px 13px;color:#111827;font-family:'Raleway',sans-serif;
                       font-size:0.875rem;font-weight:500;outline:none;transition:border-color 0.12s;">
       </div>
-
+ 
       <!-- Description -->
       <div style="margin-bottom:16px;">
         <label style="display:block;font-size:0.68rem;font-weight:700;text-transform:uppercase;
@@ -885,7 +889,7 @@ document.getElementById('shareModal').addEventListener('click', function(e) {
                          font-size:0.84rem;resize:none;outline:none;line-height:1.55;
                          transition:border-color 0.12s;"></textarea>
       </div>
-
+ 
       <!-- Visibility toggle -->
       <div style="display:flex;align-items:center;gap:14px;padding:12px 14px;
                   background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;margin-bottom:18px;">
@@ -917,13 +921,13 @@ document.getElementById('shareModal').addEventListener('click', function(e) {
                style="font-size:0.7rem;color:#6B7280;margin-top:1px;">Visible to all teammates in the Vault</div>
         </div>
       </div>
-
+ 
       <!-- Status message -->
       <div id="sm-status"
            style="display:none;align-items:center;gap:8px;
                   padding:10px 14px;background:#F0FDF4;border:1px solid #D1FAE5;
                   border-radius:7px;margin-bottom:14px;flex-wrap:wrap;"></div>
-
+ 
       <!-- Footer buttons -->
       <div style="display:flex;gap:8px;justify-content:flex-end;">
         <button onclick="closeShareModal()"
@@ -945,11 +949,11 @@ document.getElementById('shareModal').addEventListener('click', function(e) {
           ⬡ Share to Vault
         </button>
       </div>
-
+ 
     </div>
   </div>
 </div>
-
+ 
 <style>
   .sm-spinner {
     width:13px;height:13px;border:2px solid rgba(255,255,255,0.3);
@@ -960,5 +964,6 @@ document.getElementById('shareModal').addEventListener('click', function(e) {
     border-color:#0070F3;box-shadow:0 0 0 3px rgba(0,112,243,0.12);
   }
 </style>
-
+ 
 {% endblock %}
+ 
