@@ -1,7 +1,10 @@
+
+Copy
+
 """
 LaunchGate — app.py  (v2 — with NeuroVerse Quiz Portal integrated)
 """
-
+ 
 from flask import (
     Flask, render_template, request,
     redirect, url_for, session, jsonify, flash
@@ -10,24 +13,27 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 import sqlite3
 import hashlib
 import os
+import json as json_lib
+import urllib.request
+import urllib.error
 from datetime import datetime
 from functools import wraps
-
+ 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "launchgate-secret-2026-x")
 app.config["DATABASE"] = os.path.join(os.path.dirname(__file__), "launchgate.db")
-
+ 
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
-
+ 
 ADMIN_PASSKEY = os.environ.get("ADMIN_PASSKEY", "NEURO-2026-X")
-
-
+ 
+ 
 def get_db():
     conn = sqlite3.connect(app.config["DATABASE"])
     conn.row_factory = sqlite3.Row
     return conn
-
-
+ 
+ 
 def init_db():
     with get_db() as db:
         db.executescript("""
@@ -112,12 +118,12 @@ def init_db():
             );
         """)
     print("Database ready")
-
-
+ 
+ 
 def hash_password(pw):
     return hashlib.sha256(pw.encode()).hexdigest()
-
-
+ 
+ 
 def get_unread_count(user_id):
     with get_db() as db:
         row = db.execute(
@@ -125,13 +131,13 @@ def get_unread_count(user_id):
             (user_id,)
         ).fetchone()
     return row["cnt"] if row else 0
-
-
+ 
+ 
 @app.template_filter('index_to_char')
 def index_to_char(index):
     return chr(97 + int(index))
-
-
+ 
+ 
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -139,8 +145,8 @@ def login_required(f):
             return redirect(url_for("login"))
         return f(*args, **kwargs)
     return decorated
-
-
+ 
+ 
 def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -153,8 +159,8 @@ def admin_required(f):
             return redirect(url_for("dashboard"))
         return f(*args, **kwargs)
     return decorated
-
-
+ 
+ 
 @app.route("/", methods=["GET", "POST"])
 def login():
     if "user_id" in session:
@@ -180,8 +186,8 @@ def login():
             flash("Admin access granted.", "success")
         return redirect(url_for("dashboard"))
     return render_template("login.html")
-
-
+ 
+ 
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
@@ -204,13 +210,13 @@ def register():
         except sqlite3.IntegrityError:
             flash("Username or email already taken.", "error"); return redirect(url_for("register"))
     return render_template("register.html")
-
-
+ 
+ 
 @app.route("/logout")
 def logout():
     session.clear(); return redirect(url_for("login"))
-
-
+ 
+ 
 @app.route("/dashboard")
 @login_required
 def dashboard():
@@ -235,8 +241,8 @@ def dashboard():
         docs=docs, snippets=snippets, users=users, unread=unread,
         available_quizzes=available_quizzes, my_quiz_attempts=my_quiz_attempts,
         recent_quizzes=recent_quizzes)
-
-
+ 
+ 
 @app.route("/editor")
 @app.route("/editor/<int:doc_id>")
 @login_required
@@ -248,8 +254,8 @@ def editor(doc_id=None):
                              (doc_id, session["user_id"])).fetchone()
     unread = get_unread_count(session["user_id"])
     return render_template("editor.html", doc=doc, unread=unread)
-
-
+ 
+ 
 @app.route("/api/document/save", methods=["POST"])
 @login_required
 def save_document():
@@ -267,16 +273,16 @@ def save_document():
                              (session["user_id"], title, content, now))
             doc_id = cur.lastrowid
     return jsonify({"ok": True, "doc_id": doc_id})
-
-
+ 
+ 
 @app.route("/api/document/<int:doc_id>", methods=["DELETE"])
 @login_required
 def delete_document(doc_id):
     with get_db() as db:
         db.execute("DELETE FROM documents WHERE id=? AND user_id=?", (doc_id, session["user_id"]))
     return jsonify({"ok": True})
-
-
+ 
+ 
 @app.route("/vault")
 @login_required
 def vault():
@@ -290,8 +296,8 @@ def vault():
         my_snippets = db.execute("SELECT v.*, u.username FROM vault_snippets v JOIN users u ON v.user_id=u.id WHERE v.user_id=? ORDER BY v.created_at DESC", (session["user_id"],)).fetchall()
         unread = get_unread_count(session["user_id"])
     return render_template("vault.html", snippets=snippets, my_snippets=my_snippets, filter_lang=lang, search=search, unread=unread)
-
-
+ 
+ 
 @app.route("/api/vault/save", methods=["POST"])
 @login_required
 def save_snippet():
@@ -305,18 +311,18 @@ def save_snippet():
                              (session["user_id"], data["title"], data["language"], data["code"], data.get("description",""), int(data.get("is_public",1))))
             sid = cur.lastrowid
     return jsonify({"ok": True, "id": sid})
-
-
+ 
+ 
 @app.route("/api/vault/<int:snippet_id>", methods=["DELETE"])
 @login_required
 def delete_snippet(snippet_id):
     with get_db() as db:
         db.execute("DELETE FROM vault_snippets WHERE id=? AND user_id=?", (snippet_id, session["user_id"]))
     return jsonify({"ok": True})
-
-
+ 
+ 
 # ── QUIZ PORTAL ────────────────────────────────────────────────────────────────
-
+ 
 @app.route("/quizzes")
 @login_required
 def quiz_home():
@@ -331,8 +337,8 @@ def quiz_home():
         ).fetchall()
         unread = get_unread_count(session["user_id"])
     return render_template("quiz_home.html", quizzes=quizzes, attempted_ids=attempted_ids, my_responses=my_responses, unread=unread)
-
-
+ 
+ 
 @app.route("/quizzes/create", methods=["GET", "POST"])
 @login_required
 @admin_required
@@ -363,8 +369,8 @@ def quiz_create():
         return redirect(url_for("quiz_manage"))
     unread = get_unread_count(session["user_id"])
     return render_template("quiz_create.html", unread=unread)
-
-
+ 
+ 
 @app.route("/quizzes/manage")
 @login_required
 @admin_required
@@ -375,8 +381,8 @@ def quiz_manage():
         ).fetchall()
         unread = get_unread_count(session["user_id"])
     return render_template("quiz_manage.html", quizzes=quizzes, unread=unread)
-
-
+ 
+ 
 @app.route("/quizzes/<int:quiz_id>/attempt")
 @login_required
 def quiz_attempt(quiz_id):
@@ -390,8 +396,8 @@ def quiz_attempt(quiz_id):
             quiz_data.append({"question": q, "options": opts})
         unread = get_unread_count(session["user_id"])
     return render_template("quiz_attempt.html", quiz=quiz, quiz_data=quiz_data, unread=unread)
-
-
+ 
+ 
 @app.route("/quizzes/<int:quiz_id>/submit", methods=["POST"])
 @login_required
 def quiz_submit(quiz_id):
@@ -410,8 +416,8 @@ def quiz_submit(quiz_id):
         db.execute("UPDATE quiz_responses SET score=? WHERE id=?", (score, resp_id))
     flash(f"Test submitted! Score: {score}/{total}", "success")
     return redirect(url_for("quiz_home"))
-
-
+ 
+ 
 @app.route("/quizzes/<int:quiz_id>/responses")
 @login_required
 @admin_required
@@ -425,8 +431,8 @@ def quiz_responses(quiz_id):
         ).fetchall()
         unread = get_unread_count(session["user_id"])
     return render_template("quiz_responses.html", quiz=quiz, responses=responses, unread=unread)
-
-
+ 
+ 
 @app.route("/quizzes/response/<int:resp_id>")
 @login_required
 @admin_required
@@ -447,8 +453,8 @@ def quiz_review(resp_id):
             })
         unread = get_unread_count(session["user_id"])
     return render_template("quiz_review.html", resp=resp, student=student, quiz=quiz, full_paper=full_paper, unread=unread)
-
-
+ 
+ 
 @app.route("/quizzes/<int:quiz_id>/toggle", methods=["POST"])
 @login_required
 @admin_required
@@ -458,8 +464,8 @@ def quiz_toggle(quiz_id):
         nv = 0 if q["is_active"] else 1
         db.execute("UPDATE quizzes SET is_active=? WHERE id=?", (nv, quiz_id))
     return jsonify({"ok": True, "is_active": bool(nv)})
-
-
+ 
+ 
 @app.route("/quizzes/<int:quiz_id>/delete", methods=["POST"])
 @login_required
 @admin_required
@@ -473,18 +479,18 @@ def quiz_delete(quiz_id):
         db.execute("DELETE FROM quiz_responses WHERE quiz_id=?", (quiz_id,))
         db.execute("DELETE FROM quizzes WHERE id=?", (quiz_id,))
     flash("Quiz deleted.", "success"); return redirect(url_for("quiz_manage"))
-
-
+ 
+ 
 # ── Social Hub ─────────────────────────────────────────────────────────────────
-
+ 
 @app.route("/api/users")
 @login_required
 def api_get_users():
     with get_db() as db:
         users = db.execute("SELECT id, username FROM users WHERE id!=? ORDER BY username", (session["user_id"],)).fetchall()
     return jsonify({"users": [{"id": u["id"], "username": u["username"], "online": True} for u in users]})
-
-
+ 
+ 
 @app.route("/api/messages/<int:peer_id>")
 @login_required
 def api_get_messages(peer_id):
@@ -496,8 +502,8 @@ def api_get_messages(peer_id):
         ).fetchall()
         db.execute("UPDATE messages SET is_read=1 WHERE receiver_id=? AND sender_id=?", (uid, peer_id))
     return jsonify({"messages": [dict(m) for m in msgs]})
-
-
+ 
+ 
 @app.route("/api/messages/send", methods=["POST"])
 @login_required
 def api_send_message():
@@ -508,41 +514,41 @@ def api_send_message():
         cur = db.execute("INSERT INTO messages (sender_id,receiver_id,content,created_at) VALUES (?,?,?,?)",
                          (session["user_id"], rid, content, now))
     return jsonify({"ok": True, "id": cur.lastrowid})
-
-
+ 
+ 
 @app.route("/api/unread")
 @login_required
 def api_unread():
     return jsonify({"unread": get_unread_count(session["user_id"])})
-
-
+ 
+ 
 @socketio.on("connect")
 def on_connect():
     uid = session.get("user_id")
     if uid: join_room(f"user_{uid}"); emit("status", {"msg": f"Connected"})
-
-
+ 
+ 
 @socketio.on("user_online")
 def on_user_online(data):
     uid = session.get("user_id")
     if uid: join_room(f"user_{uid}"); emit("user_joined", {"user_id": uid, "username": session.get("username")}, broadcast=True, include_self=False)
-
-
+ 
+ 
 @socketio.on("send_message")
 def on_send_message(data):
     sid = session.get("user_id"); rid = data.get("recipient_id"); content = data.get("content","").strip()
     if not sid or not rid or not content: return
     emit("receive_message", {"sender_id": sid, "sender_username": session.get("username"), "receiver_id": rid, "content": content, "created_at": data.get("created_at", datetime.now().isoformat(timespec="seconds"))}, room=f"user_{rid}")
-
-
+ 
+ 
 @socketio.on("disconnect")
 def on_disconnect():
     uid = session.get("user_id")
     if uid: emit("user_left", {"user_id": uid}, broadcast=True, include_self=False)
-
-
+ 
+ 
 # ── Settings ───────────────────────────────────────────────────────────────────
-
+ 
 @app.route("/settings", methods=["GET", "POST"])
 @login_required
 def settings():
@@ -574,10 +580,10 @@ def settings():
         quiz_count    = db.execute("SELECT COUNT(*) AS c FROM quiz_responses WHERE user_id=?", (session["user_id"],)).fetchone()["c"]
         unread = get_unread_count(session["user_id"])
     return render_template("settings.html", user=user, doc_count=doc_count, snippet_count=snippet_count, quiz_count=quiz_count, unread=unread)
-
-
+ 
+ 
 # ── Admin Panel ────────────────────────────────────────────────────────────────
-
+ 
 @app.route("/admin")
 @login_required
 @admin_required
@@ -591,8 +597,8 @@ def admin_panel():
         total_attempts = db.execute("SELECT COUNT(*) AS c FROM quiz_responses").fetchone()["c"]
         unread         = get_unread_count(session["user_id"])
     return render_template("admin.html", users=users, snippets=snippets, total_docs=total_docs, total_msgs=total_msgs, total_quizzes=total_quizzes, total_attempts=total_attempts, unread=unread)
-
-
+ 
+ 
 @app.route("/api/admin/delete_user/<int:uid>", methods=["DELETE"])
 @login_required
 @admin_required
@@ -604,8 +610,8 @@ def admin_delete_user(uid):
         db.execute("DELETE FROM messages WHERE sender_id=? OR receiver_id=?", (uid, uid))
         db.execute("DELETE FROM users WHERE id=?", (uid,))
     return jsonify({"ok": True})
-
-
+ 
+ 
 @app.route("/api/admin/toggle_admin/<int:uid>", methods=["POST"])
 @login_required
 @admin_required
@@ -616,16 +622,67 @@ def admin_toggle_admin(uid):
         nv = 0 if user["is_admin"] else 1
         db.execute("UPDATE users SET is_admin=? WHERE id=?", (nv, uid))
     return jsonify({"ok": True, "is_admin": bool(nv)})
-
-
-
-
+ 
+ 
+ 
+ 
 @app.route("/code-editor")
 @login_required
 def code_editor():
     unread = get_unread_count(session["user_id"])
     return render_template("code_editor.html", unread=unread)
-
+ 
+ 
+# ── Code Execution (Piston API proxy) ─────────────────────────────────────────
+ 
+@app.route("/api/run-code", methods=["POST"])
+@login_required
+def run_code():
+    """
+    Proxy route that calls the Piston API from the server side.
+    This avoids CORS issues and the 401 error that occurs when calling
+    Piston directly from the browser.
+    """
+    data     = request.get_json(force=True) or {}
+    language = data.get("language", "python")
+    version  = data.get("version", "*")
+    code     = data.get("code", "")
+    stdin    = data.get("stdin", "")
+    args     = data.get("args", [])
+ 
+    if not code.strip():
+        return jsonify({"ok": False, "error": "No code provided."}), 400
+ 
+    payload = json_lib.dumps({
+        "language": language,
+        "version":  version,
+        "files":    [{"name": "main", "content": code}],
+        "stdin":    stdin,
+        "args":     args
+    }).encode("utf-8")
+ 
+    try:
+        req = urllib.request.Request(
+            "https://emkc.org/api/v2/piston/execute",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            result = json_lib.loads(resp.read().decode("utf-8"))
+        return jsonify({"ok": True, "result": result})
+ 
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="ignore")
+        return jsonify({"ok": False, "error": f"Piston API error {e.code}: {body}"}), 502
+ 
+    except urllib.error.URLError as e:
+        return jsonify({"ok": False, "error": f"Could not reach Piston API: {e.reason}"}), 503
+ 
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+ 
+ 
 if __name__ == "__main__":
     init_db()
     print("LaunchGate ready at http://localhost:5000")
