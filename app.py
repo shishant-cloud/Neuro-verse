@@ -1,6 +1,4 @@
 
-Copy
-
 """
 LaunchGate — app.py  (v2 — with NeuroVerse Quiz Portal integrated)
 """
